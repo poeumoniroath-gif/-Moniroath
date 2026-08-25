@@ -1,0 +1,6 @@
+{
+  "name": "Jolly Slushie",
+  "description": "ប្រព័ន្ធកត់ត្រាការលក់សាមញ្ញសម្រាប់ហាង Jolly Slushie - លឿន ងាយស្រួល និងសុវត្ថិភាព",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

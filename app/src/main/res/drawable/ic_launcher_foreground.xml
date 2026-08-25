@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Straw -->
+    <path
+        android:fillColor="#FF2E93"
+        android:pathData="M62,18 L68,20 L58,52 L52,50 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,24 L66,26 L64,32 L58,30 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,38 L62,40 L60,46 L54,44 Z" />
+
+    <!-- Slushie Whipped / Swirl Top -->
+    <path
+        android:fillColor="#FF007F"
+        android:pathData="M54,26 C44,26 40,34 36,40 C34,43 36,48 40,49 C42,49 44,46 47,44 C50,47 55,47 59,44 C62,47 68,46 70,43 C72,39 67,26 54,26 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M54,30 C47,30 43,36 41,41 C43,43 47,42 50,40 C54,44 59,42 62,39 C64,41 67,40 68,38 C67,34 62,30 54,30 Z" />
+
+    <!-- Slushie Cup Lid Rim -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,48 L77,48 A2,2 0 0,1 79,50 L79,52 A2,2 0 0,1 77,54 L31,54 A2,2 0 0,1 29,52 L29,50 A2,2 0 0,1 31,48 Z" />
+
+    <!-- Cup Body -->
+    <path
+        android:fillColor="#E0F7FA"
+        android:pathData="M33,54 L75,54 L69,90 A4,4 0 0,1 65,94 L43,94 A4,4 0 0,1 39,90 Z" />
+
+    <!-- Inside Slushie Swirl Layers -->
+    <!-- Pink Layer -->
+    <path
+        android:fillColor="#FF2E93"
+        android:pathData="M34,56 L74,56 L72,68 C64,64 56,72 48,67 C42,63 37,68 35,68 Z" />
+    <!-- Blue / Cyan Layer -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M35,68 C37,68 42,63 48,67 C56,72 64,64 72,68 L70,80 C62,76 54,83 46,78 C40,75 37,80 37,80 Z" />
+    <!-- Yellow / Candy Layer -->
+    <path
+        android:fillColor="#FFD600"
+        android:pathData="M37,80 C37,80 40,75 46,78 C54,83 62,76 70,80 L69,90 A4,4 0 0,1 65,94 L43,94 A4,4 0 0,1 39,90 Z" />
+
+    <!-- Gummy Bear / Candy Accents -->
+    <path
+        android:fillColor="#76FF03"
+        android:pathData="M48,60 C46.5,60 45,61.5 45,63 C45,64.5 46.5,66 48,66 C49.5,66 51,64.5 51,63 C51,61.5 49.5,60 48,60 Z" />
+    <path
+        android:fillColor="#FF9100"
+        android:pathData="M58,72 C56.5,72 55,73.5 55,75 C55,76.5 56.5,78 58,78 C59.5,78 61,76.5 61,75 C61,73.5 59.5,72 58,72 Z" />
+
+    <!-- Sparkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M78,36 L80,30 L82,36 L88,38 L82,40 L80,46 L78,40 L72,38 Z" />
+</vector>
