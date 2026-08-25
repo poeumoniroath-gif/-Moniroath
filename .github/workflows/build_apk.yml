@@ -24,12 +24,16 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
 
-      - name: Generate Wrapper and Build APK
+      - name: Prepare Keystore and Build
         run: |
-          gradle wrapper
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          touch .env
+          gradle :app:assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
