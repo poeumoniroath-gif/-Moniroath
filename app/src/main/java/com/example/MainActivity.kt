@@ -36,6 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.ui.components.CloudConfigDialog
 import com.example.ui.SalesViewModel
 import com.example.ui.components.HeaderBar
 import com.example.ui.screens.HistoryScreen
@@ -70,6 +74,10 @@ fun JollySlushieApp(
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val todayRevenue by viewModel.todayTotalRevenue.collectAsStateWithLifecycle()
     val todayItemsCount by viewModel.todayTotalItemsCount.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+    val cloudConfig by viewModel.cloudConfig.collectAsStateWithLifecycle()
+
+    var showCloudSettingsDialog by remember { mutableStateOf(false) }
 
     val navTabs = listOf(
         NavTabItem(
@@ -97,7 +105,9 @@ fun JollySlushieApp(
         topBar = {
             HeaderBar(
                 todayRevenue = todayRevenue,
-                todayItemsCount = todayItemsCount
+                todayItemsCount = todayItemsCount,
+                isOnline = isOnline,
+                onOpenSettings = { showCloudSettingsDialog = true }
             )
         },
         bottomBar = {
@@ -150,5 +160,16 @@ fun JollySlushieApp(
                 2 -> HistoryScreen(viewModel = viewModel)
             }
         }
+    }
+
+    if (showCloudSettingsDialog) {
+        CloudConfigDialog(
+            config = cloudConfig,
+            onSave = { updated ->
+                viewModel.updateCloudConfig(updated)
+                showCloudSettingsDialog = false
+            },
+            onDismiss = { showCloudSettingsDialog = false }
+        )
     }
 }

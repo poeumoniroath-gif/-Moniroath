@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +43,8 @@ import com.example.util.Formatters
 fun HeaderBar(
     todayRevenue: Long,
     todayItemsCount: Int,
+    isOnline: Boolean = true,
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -93,28 +101,52 @@ fun HeaderBar(
                     }
                 }
 
-                // Security / Non-editable badge
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFFFEF2F2),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECACA))
+                // Online/Offline status & Settings button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Online Badge
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isOnline) Color(0xFFF0FDF4) else Color(0xFFF8FAFC),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isOnline) Color(0xFFBBF7D0) else Color(0xFFE2E8F0)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isOnline) Color(0xFF10B981) else Color(0xFF94A3B8))
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isOnline) "Online" else "Offline",
+                                color = if (isOnline) Color(0xFF15803D) else Color(0xFF64748B),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Cloud Settings Icon
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("cloud_settings_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "ការលក់ជាប់ថេរ",
-                            tint = Color(0xFFDC2626),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "ការលក់ជាប់ថេរ",
-                            color = Color(0xFFB91C1C),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = "Cloud & Telegram Settings",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }

@@ -60,16 +60,29 @@ import com.example.ui.ProductSaleSummary
 import com.example.ui.SalesViewModel
 import com.example.util.Formatters
 
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.platform.LocalContext
+import com.example.util.SyncState
+
 @Composable
 fun ReportScreen(
     viewModel: SalesViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val selectedDate by viewModel.selectedReportDate.collectAsStateWithLifecycle()
     val allDates by viewModel.allSaleDates.collectAsStateWithLifecycle()
     val sales by viewModel.selectedDateSales.collectAsStateWithLifecycle()
     val productSummaries by viewModel.selectedDateProductSummaries.collectAsStateWithLifecycle()
     val dailyClosure by viewModel.selectedDateClosure.collectAsStateWithLifecycle()
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val cloudConfig by viewModel.cloudConfig.collectAsStateWithLifecycle()
+    val feedbackMessage by viewModel.feedbackMessage.collectAsStateWithLifecycle()
 
     val totalRevenue = sales.sumOf { it.totalPrice.toLong() }
     val totalItems = sales.sumOf { it.quantity }
@@ -86,6 +99,41 @@ fun ReportScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Feedback message banner if any
+        if (feedbackMessage != null) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (feedbackMessage?.isSuccess == true) Color(0xFFF0FDF4) else Color(0xFFFEF2F2),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (feedbackMessage?.isSuccess == true) Color(0xFF86EFAC) else Color(0xFFFECACA)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.clearFeedback() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (feedbackMessage?.isSuccess == true) Icons.Default.CheckCircle else Icons.Default.Cloud,
+                            contentDescription = null,
+                            tint = if (feedbackMessage?.isSuccess == true) Color(0xFF16A34A) else Color(0xFFDC2626),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = feedbackMessage?.message.orEmpty(),
+                            color = if (feedbackMessage?.isSuccess == true) Color(0xFF15803D) else Color(0xFFB91C1C),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
         // Date Picker Carousel
         item {
             Column {
@@ -460,6 +508,147 @@ fun ReportScreen(
                                     fontSize = 12.sp
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Online Cloud & Telegram Dispatch Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "✈️",
+                                fontSize = 18.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "ផ្ញើរបាយការណ៍ & Cloud Sync",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
+
+                        if (cloudConfig.lastSyncTimestamp > 0L) {
+                            Text(
+                                text = "Sync ចុងក្រោយ: ${Formatters.formatTimestampToTime(cloudConfig.lastSyncTimestamp)}",
+                                fontSize = 11.sp,
+                                color = Color(0xFF64748B)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "ចែករំលែកសេចក្តីសង្ខេបនៃការលក់ទៅកាន់ Telegram ឬ Sync ទិន្នន័យឡើង Cloud ដើម្បីពិនិត្យមើលពីគ្រប់ទីកន្លែង។",
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 18.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Telegram Share Button
+                        Button(
+                            onClick = {
+                                viewModel.triggerTelegramShare(context, selectedDate)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("share_telegram_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF229ED9), // Telegram Blue
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Telegram",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        // Cloud Sync Button
+                        Button(
+                            onClick = {
+                                viewModel.syncDataToCloud()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("sync_cloud_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF0F172A),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (syncState == SyncState.SYNCING) Icons.Default.CloudSync else Icons.Default.CloudUpload,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (syncState == SyncState.SYNCING) "Syncing..." else "Sync Cloud",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    // If Telegram Bot Token is configured, provide direct 1-tap Bot Send button
+                    if (cloudConfig.telegramBotToken.isNotBlank() && cloudConfig.telegramChatId.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { viewModel.sendTelegramBotReportDirect() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("direct_bot_send_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF0284C7)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "ផ្ញើស្វ័យប្រវត្តិតាម Telegram Bot",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
