@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
@@ -30,17 +30,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -55,7 +54,8 @@ fun SaleConfirmDialog(
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     onSelectQuickQty: (Int) -> Unit,
-    onConfirm: () -> Unit,
+    onAddToCart: () -> Unit,
+    onQuickConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val totalAmount = product.priceRiel * quantity
@@ -85,7 +85,7 @@ fun SaleConfirmDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "ជ្រើសរើសបរិមាណលក់",
+                        text = "ជ្រើសរើសបរិមាណ",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -103,7 +103,7 @@ fun SaleConfirmDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Product Card Info
                 Box(
@@ -116,7 +116,7 @@ fun SaleConfirmDialog(
                             Color(product.primaryColorHex).copy(alpha = 0.3f),
                             RoundedCornerShape(16.dp)
                         )
-                        .padding(16.dp)
+                        .padding(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -124,12 +124,12 @@ fun SaleConfirmDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(52.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color.White),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = product.iconEmoji, fontSize = 30.sp)
+                            Text(text = product.iconEmoji, fontSize = 28.sp)
                         }
 
                         Spacer(modifier = Modifier.width(14.dp))
@@ -137,15 +137,15 @@ fun SaleConfirmDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = product.nameKh,
-                                style = MaterialTheme.typography.titleLarge.copy(
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "តម្លៃរាយ: ${Formatters.formatRiel(product.priceRiel)}",
-                                style = MaterialTheme.typography.bodyMedium.copy(
+                                style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -154,32 +154,22 @@ fun SaleConfirmDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Large Quantity Stepper (- [ QTY ] +)
-                Text(
-                    text = "បរិមាណ (ចំនួន)",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Big Minus Button
+                    // Minus Button
                     FilledIconButton(
                         onClick = onDecrement,
                         enabled = quantity > 1,
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(54.dp)
                             .testTag("decrement_qty_button"),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = Color(0xFFF1F5F9),
                             contentColor = Color(0xFF0F172A),
@@ -190,18 +180,18 @@ fun SaleConfirmDialog(
                         Icon(
                             imageVector = Icons.Default.Remove,
                             contentDescription = "បន្ថយបរិមាណ",
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(20.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
                     // Quantity Display Box
                     Surface(
                         modifier = Modifier
-                            .width(90.dp)
-                            .height(60.dp),
-                        shape = RoundedCornerShape(16.dp),
+                            .width(84.dp)
+                            .height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
                         border = androidx.compose.foundation.BorderStroke(
                             2.dp,
@@ -220,15 +210,15 @@ fun SaleConfirmDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(20.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
-                    // Big Plus Button
+                    // Plus Button
                     FilledIconButton(
                         onClick = onIncrement,
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(54.dp)
                             .testTag("increment_qty_button"),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.White
@@ -237,12 +227,12 @@ fun SaleConfirmDialog(
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "បន្ថែមបរិមាណ",
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Quick Quantity Selector Pills
                 Row(
@@ -259,21 +249,21 @@ fun SaleConfirmDialog(
                                     else Color(0xFFF1F5F9)
                                 )
                                 .clickable { onSelectQuickQty(qtyOption) }
-                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
                                 .testTag("quick_qty_$qtyOption"),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "$qtyOption",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 color = if (isSelected) Color.White else Color(0xFF334155)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Subtotal Calculation Box
                 Box(
@@ -282,7 +272,7 @@ fun SaleConfirmDialog(
                         .clip(RoundedCornerShape(14.dp))
                         .background(Color(0xFFF8FAFC))
                         .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-                        .padding(14.dp)
+                        .padding(12.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -291,8 +281,8 @@ fun SaleConfirmDialog(
                     ) {
                         Column {
                             Text(
-                                text = "ទឹកប្រាក់សរុប",
-                                style = MaterialTheme.typography.bodyMedium.copy(
+                                text = "ទឹកប្រាក់មុខទំនិញនេះ",
+                                style = MaterialTheme.typography.bodySmall.copy(
                                     color = Color(0xFF64748B),
                                     fontWeight = FontWeight.Medium
                                 )
@@ -306,7 +296,7 @@ fun SaleConfirmDialog(
                         }
                         Text(
                             text = Formatters.formatRiel(totalAmount),
-                            style = MaterialTheme.typography.headlineSmall.copy(
+                            style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color(0xFF059669)
                             )
@@ -314,66 +304,64 @@ fun SaleConfirmDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Strict Non-Undo Notice
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFFFBEB),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
-                    modifier = Modifier.fillMaxWidth()
+                // Dual Action Buttons: Add To Cart (Primary) & Quick Checkout
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.Top
+                    // Add To Cart Button
+                    Button(
+                        onClick = onAddToCart,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("add_to_cart_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White
+                        )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "ចំណាំ",
-                            tint = Color(0xFFD97706),
-                            modifier = Modifier.size(18.dp)
+                            imageVector = Icons.Default.AddShoppingCart,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "ក្រោយចុចបញ្ជាក់ មិនអាចកែប្រែ ឬលុបបានទេ។ បើលក់ខុស សូមកត់លើក្រដាសរាយការណ៍ទៅម្ចាស់ហាង។",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color(0xFF92400E),
-                                lineHeight = 18.sp,
-                                fontWeight = FontWeight.Normal
-                            )
+                            text = "ដាក់កន្ត្រក",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Giant Green Confirm Sale Button
-                Button(
-                    onClick = onConfirm,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp)
-                        .testTag("confirm_sale_button"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF059669),
-                        contentColor = Color.White
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCartCheckout,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "បញ្ជាក់ការលក់ (${Formatters.formatRiel(totalAmount)})",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
+                    // Quick Sell Button
+                    Button(
+                        onClick = onQuickConfirm,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(52.dp)
+                            .testTag("quick_confirm_sale_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF059669),
+                            contentColor = Color.White
                         )
-                    )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCartCheckout,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "លក់ភ្លាមៗ",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
         }

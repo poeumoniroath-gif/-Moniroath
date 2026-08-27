@@ -11,6 +11,9 @@ interface SalesDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSale(sale: SaleRecord): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSales(sales: List<SaleRecord>): List<Long>
+
     @Query("SELECT * FROM sales_records ORDER BY timestamp DESC")
     fun getAllSales(): Flow<List<SaleRecord>>
 

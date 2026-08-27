@@ -514,7 +514,7 @@ fun ReportScreen(
             }
         }
 
-        // Online Cloud & Telegram Dispatch Card
+        // Online Google Drive Database & Telegram Dispatch Card
         item {
             Card(
                 modifier = Modifier
@@ -535,12 +535,12 @@ fun ReportScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "✈️",
+                                text = "☁️",
                                 fontSize = 18.sp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "ផ្ញើរបាយការណ៍ & Cloud Sync",
+                                text = "Google Drive & Telegram Sync",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -558,7 +558,7 @@ fun ReportScreen(
                     }
 
                     Text(
-                        text = "ចែករំលែកសេចក្តីសង្ខេបនៃការលក់ទៅកាន់ Telegram ឬ Sync ទិន្នន័យឡើង Cloud ដើម្បីពិនិត្យមើលពីគ្រប់ទីកន្លែង។",
+                        text = "Sync ទិន្នន័យ 2-Way ជាមួយ Google Drive Database (ទាញយក & បញ្ជូនការលក់ពីគ្រប់ទូរស័ព្ទ) ឬចែករំលែករបាយការណ៍ទៅ Telegram។",
                         fontSize = 13.sp,
                         color = Color(0xFF64748B),
                         lineHeight = 18.sp
@@ -568,13 +568,41 @@ fun ReportScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // Google Drive 2-Way Sync Button
+                        Button(
+                            onClick = {
+                                viewModel.syncWithGoogleDrive(silent = false)
+                            },
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .height(48.dp)
+                                .testTag("sync_google_drive_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF0F172A),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (syncState == SyncState.SYNCING) Icons.Default.CloudSync else Icons.Default.CloudUpload,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (syncState == SyncState.SYNCING) "Syncing..." else "Sync Google Drive",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+
                         // Telegram Share Button
                         Button(
                             onClick = {
                                 viewModel.triggerTelegramShare(context, selectedDate)
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(0.9f)
                                 .height(48.dp)
                                 .testTag("share_telegram_button"),
                             shape = RoundedCornerShape(12.dp),
@@ -592,35 +620,7 @@ fun ReportScreen(
                             Text(
                                 text = "Telegram",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        // Cloud Sync Button
-                        Button(
-                            onClick = {
-                                viewModel.syncDataToCloud()
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp)
-                                .testTag("sync_cloud_button"),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF0F172A),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(
-                                imageVector = if (syncState == SyncState.SYNCING) Icons.Default.CloudSync else Icons.Default.CloudUpload,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (syncState == SyncState.SYNCING) "Syncing..." else "Sync Cloud",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                fontSize = 12.sp
                             )
                         }
                     }

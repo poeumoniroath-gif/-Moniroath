@@ -18,6 +18,8 @@ class SalesRepository(private val salesDao: SalesDao) {
 
     suspend fun recordSale(sale: SaleRecord): Long = salesDao.insertSale(sale)
 
+    suspend fun recordSales(sales: List<SaleRecord>): List<Long> = salesDao.insertSales(sales)
+
     suspend fun recordDailyClosure(closure: DailyClosureRecord) =
         salesDao.insertDailyClosure(closure)
 

@@ -140,7 +140,20 @@ fun SaleSuccessDialog(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            if (event.itemsSummary.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    event.itemsSummary.forEach { itemLine ->
+                                        Text(
+                                            text = "• $itemLine",
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF166534)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

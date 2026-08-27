@@ -25,9 +25,15 @@ enum class SyncState {
 data class CloudConfig(
     val telegramBotToken: String = "",
     val telegramChatId: String = "",
-    val cloudWebhookUrl: String = "",
-    val autoSyncOnSale: Boolean = false,
+    val googleDriveScriptUrl: String = "",
+    val autoSyncOnSale: Boolean = true,
     val lastSyncTimestamp: Long = 0L
+)
+
+data class SyncPullResult(
+    val newSales: List<SaleRecord>,
+    val newClosures: List<DailyClosureRecord>,
+    val message: String
 )
 
 object CloudSyncManager {
@@ -35,16 +41,136 @@ object CloudSyncManager {
     private const val PREFS_NAME = "jolly_slushie_cloud_prefs"
     private const val KEY_BOT_TOKEN = "telegram_bot_token"
     private const val KEY_CHAT_ID = "telegram_chat_id"
-    private const val KEY_WEBHOOK_URL = "cloud_webhook_url"
+    private const val KEY_GOOGLE_DRIVE_URL = "google_drive_script_url"
     private const val KEY_AUTO_SYNC = "auto_sync_enabled"
     private const val KEY_LAST_SYNC = "last_sync_time"
 
     private val httpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .build()
     }
+
+    const val GOOGLE_APPS_SCRIPT_SAMPLE = """
+/**
+ * Google Apps Script for Jolly Slushie POS - Google Drive Shared Database
+ * Instructions:
+ * 1. Go to https://script.google.com or open a Google Sheet in Google Drive.
+ * 2. Click Extensions -> Apps Script.
+ * 3. Paste this entire code into Code.gs.
+ * 4. Click Deploy -> New deployment -> Select type: Web App.
+ * 5. Set 'Execute as': 'Me' and 'Who has access': 'Anyone'.
+ * 6. Click Deploy, copy the Web App URL and paste it into the POS App Google Drive URL.
+ */
+
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create("Jolly Slushie POS Database");
+  var salesSheet = ss.getSheetByName("Sales") || ss.insertSheet("Sales");
+  var closuresSheet = ss.getSheetByName("Closures") || ss.insertSheet("Closures");
+  
+  var salesData = salesSheet.getDataRange().getValues();
+  var salesList = [];
+  for (var i = 1; i < salesData.length; i++) {
+    var row = salesData[i];
+    if (row[0]) {
+      salesList.push({
+        id: Number(row[0]),
+        productId: String(row[1]),
+        productName: String(row[2]),
+        unitPrice: Number(row[3]),
+        quantity: Number(row[4]),
+        totalPrice: Number(row[5]),
+        timestamp: Number(row[6]),
+        dateString: String(row[7])
+      });
+    }
+  }
+  
+  var closuresData = closuresSheet.getDataRange().getValues();
+  var closuresList = [];
+  for (var j = 1; j < closuresData.length; j++) {
+    var cRow = closuresData[j];
+    if (cRow[0]) {
+      closuresList.push({
+        dateString: String(cRow[0]),
+        closedAtTimestamp: Number(cRow[1]),
+        totalRevenue: Number(cRow[2]),
+        totalItems: Number(cRow[3]),
+        totalTransactions: Number(cRow[4]),
+        notes: String(cRow[5] || "")
+      });
+    }
+  }
+  
+  var response = {
+    status: "success",
+    sales: salesList,
+    dailyClosures: closuresList
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var contents = e.postData.contents;
+    var data = JSON.parse(contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create("Jolly Slushie POS Database");
+    
+    // Save/Update Sales Sheet
+    var salesSheet = ss.getSheetByName("Sales") || ss.insertSheet("Sales");
+    if (salesSheet.getLastRow() === 0) {
+      salesSheet.appendRow(["id", "productId", "productName", "unitPrice", "quantity", "totalPrice", "timestamp", "dateString"]);
+    }
+    
+    var existingSales = salesSheet.getDataRange().getValues();
+    var existingIds = {};
+    for (var i = 1; i < existingSales.length; i++) {
+      existingIds[existingSales[i][0]] = true;
+    }
+    
+    var incomingSales = data.sales || [];
+    for (var k = 0; k < incomingSales.length; k++) {
+      var s = incomingSales[k];
+      if (!existingIds[s.id]) {
+        salesSheet.appendRow([s.id, s.productId, s.productName, s.unitPrice, s.quantity, s.totalPrice, s.timestamp, s.dateString]);
+        existingIds[s.id] = true;
+      }
+    }
+    
+    // Save/Update Daily Closures Sheet
+    var closuresSheet = ss.getSheetByName("Closures") || ss.insertSheet("Closures");
+    if (closuresSheet.getLastRow() === 0) {
+      closuresSheet.appendRow(["dateString", "closedAtTimestamp", "totalRevenue", "totalItems", "totalTransactions", "notes"]);
+    }
+    
+    var existingClosures = closuresSheet.getDataRange().getValues();
+    var existingDates = {};
+    for (var m = 1; m < existingClosures.length; m++) {
+      existingDates[existingClosures[m][0]] = true;
+    }
+    
+    var incomingClosures = data.dailyClosures || [];
+    for (var n = 0; n < incomingClosures.length; n++) {
+      var c = incomingClosures[n];
+      if (!existingDates[c.dateString]) {
+        closuresSheet.appendRow([c.dateString, c.closedAtTimestamp, c.totalRevenue, c.totalItems, c.totalTransactions, c.notes]);
+        existingDates[c.dateString] = true;
+      }
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: incomingSales.length }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+"""
 
     fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -59,8 +185,8 @@ object CloudSyncManager {
         return CloudConfig(
             telegramBotToken = prefs.getString(KEY_BOT_TOKEN, "").orEmpty(),
             telegramChatId = prefs.getString(KEY_CHAT_ID, "").orEmpty(),
-            cloudWebhookUrl = prefs.getString(KEY_WEBHOOK_URL, "").orEmpty(),
-            autoSyncOnSale = prefs.getBoolean(KEY_AUTO_SYNC, false),
+            googleDriveScriptUrl = prefs.getString(KEY_GOOGLE_DRIVE_URL, "").orEmpty(),
+            autoSyncOnSale = prefs.getBoolean(KEY_AUTO_SYNC, true),
             lastSyncTimestamp = prefs.getLong(KEY_LAST_SYNC, 0L)
         )
     }
@@ -70,7 +196,7 @@ object CloudSyncManager {
         prefs.edit()
             .putString(KEY_BOT_TOKEN, config.telegramBotToken)
             .putString(KEY_CHAT_ID, config.telegramChatId)
-            .putString(KEY_WEBHOOK_URL, config.cloudWebhookUrl)
+            .putString(KEY_GOOGLE_DRIVE_URL, config.googleDriveScriptUrl)
             .putBoolean(KEY_AUTO_SYNC, config.autoSyncOnSale)
             .putLong(KEY_LAST_SYNC, config.lastSyncTimestamp)
             .apply()
@@ -82,7 +208,7 @@ object CloudSyncManager {
     }
 
     /**
-     * Converts all sales records to structured JSON for Cloud export/sync
+     * Converts all sales records to structured JSON for Google Drive sync
      */
     fun exportSalesToJson(sales: List<SaleRecord>, closures: List<DailyClosureRecord>): String {
         val root = JSONObject()
@@ -124,29 +250,102 @@ object CloudSyncManager {
     }
 
     /**
-     * Syncs sales dataset to custom remote Cloud server or Webhook endpoint
+     * Pushes sales records to Google Drive Web App database
      */
-    suspend fun syncToRemoteCloud(
-        webhookUrl: String,
-        payloadJson: String
+    suspend fun pushToGoogleDrive(
+        scriptUrl: String,
+        sales: List<SaleRecord>,
+        closures: List<DailyClosureRecord>
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            if (webhookUrl.isBlank()) {
-                return@withContext Result.failure(IllegalArgumentException("សូមបញ្ចូល Cloud Webhook URL"))
+            if (scriptUrl.isBlank()) {
+                return@withContext Result.failure(IllegalArgumentException("សូមបញ្ចូល Google Drive Script URL"))
             }
 
+            val payloadJson = exportSalesToJson(sales, closures)
             val requestBody = payloadJson.toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder()
-                .url(webhookUrl.trim())
+                .url(scriptUrl.trim())
                 .post(requestBody)
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    Result.success("ទិន្នន័យត្រូវបាន Sync ឡើង Cloud ជោគជ័យ!")
+                    Result.success("ទិន្នន័យត្រូវបាន Sync ឡើង Google Drive ជោគជ័យ!")
                 } else {
-                    Result.failure(Exception("Cloud Server Error: ${response.code}"))
+                    Result.failure(Exception("Google Drive Server Error: ${response.code}"))
                 }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Pulls shared database from Google Drive so every device is updated
+     */
+    suspend fun pullFromGoogleDrive(
+        scriptUrl: String
+    ): Result<SyncPullResult> = withContext(Dispatchers.IO) {
+        try {
+            if (scriptUrl.isBlank()) {
+                return@withContext Result.failure(IllegalArgumentException("សូមបញ្ចូល Google Drive Script URL"))
+            }
+
+            val request = Request.Builder()
+                .url(scriptUrl.trim())
+                .get()
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string().orEmpty()
+                if (!response.isSuccessful || bodyStr.isBlank()) {
+                    return@withContext Result.failure(Exception("Google Drive Server Code: ${response.code}"))
+                }
+
+                val json = JSONObject(bodyStr)
+                val salesArray = json.optJSONArray("sales") ?: JSONArray()
+                val closuresArray = json.optJSONArray("dailyClosures") ?: JSONArray()
+
+                val salesList = mutableListOf<SaleRecord>()
+                for (i in 0 until salesArray.length()) {
+                    val item = salesArray.getJSONObject(i)
+                    salesList.add(
+                        SaleRecord(
+                            id = item.optLong("id", System.currentTimeMillis() + i),
+                            productId = item.optString("productId"),
+                            productName = item.optString("productName"),
+                            unitPrice = item.optInt("unitPrice"),
+                            quantity = item.optInt("quantity", 1),
+                            totalPrice = item.optInt("totalPrice"),
+                            timestamp = item.optLong("timestamp", System.currentTimeMillis()),
+                            dateString = item.optString("dateString")
+                        )
+                    )
+                }
+
+                val closuresList = mutableListOf<DailyClosureRecord>()
+                for (j in 0 until closuresArray.length()) {
+                    val c = closuresArray.getJSONObject(j)
+                    closuresList.add(
+                        DailyClosureRecord(
+                            dateString = c.optString("dateString"),
+                            closedAtTimestamp = c.optLong("closedAtTimestamp"),
+                            totalRevenue = c.optLong("totalRevenue"),
+                            totalItems = c.optInt("totalItems"),
+                            totalTransactions = c.optInt("totalTransactions"),
+                            notes = c.optString("notes")
+                        )
+                    )
+                }
+
+                Result.success(
+                    SyncPullResult(
+                        newSales = salesList,
+                        newClosures = closuresList,
+                        message = "ទាញយក ${salesList.size} វិក្កយបត្រពី Google Drive បានជោគជ័យ"
+                    )
+                )
             }
         } catch (e: Exception) {
             Result.failure(e)

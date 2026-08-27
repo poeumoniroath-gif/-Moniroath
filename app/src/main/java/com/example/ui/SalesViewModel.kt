@@ -7,6 +7,7 @@ import com.example.data.AppDatabase
 import com.example.data.DailyClosureRecord
 import com.example.data.SaleRecord
 import com.example.data.SalesRepository
+import com.example.model.CartItem
 import com.example.model.Product
 import com.example.model.ProductCatalog
 import com.example.model.ProductCategory
@@ -36,6 +37,7 @@ data class SaleSuccessEvent(
     val productName: String,
     val quantity: Int,
     val totalAmount: Int,
+    val itemsSummary: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -61,10 +63,35 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     private val _feedbackMessage = MutableStateFlow<SyncFeedbackMessage?>(null)
     val feedbackMessage: StateFlow<SyncFeedbackMessage?> = _feedbackMessage.asStateFlow()
 
+    // Shopping Cart State
+    private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
+    val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
+
+    val cartTotalItems: StateFlow<Int> = _cartItems.map { items ->
+        items.sumOf { it.quantity }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0
+    )
+
+    val cartTotalRiel: StateFlow<Int> = _cartItems.map { items ->
+        items.sumOf { it.totalPriceRiel }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0
+    )
+
     init {
         val db = AppDatabase.getDatabase(application)
         repository = SalesRepository(db.salesDao())
         refreshNetworkStatus()
+
+        // Auto-pull from Google Drive on startup if URL is configured
+        if (_cloudConfig.value.googleDriveScriptUrl.isNotBlank()) {
+            syncWithGoogleDrive(silent = true)
+        }
     }
 
     // Active screen navigation tab
@@ -174,7 +201,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    // Actions
+    // Navigation Tab Action
     fun selectTab(index: Int) {
         _selectedTab.value = index
     }
@@ -209,19 +236,109 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun confirmSale() {
+    // --- CART FUNCTIONALITY ---
+
+    fun addToCart(product: Product, quantity: Int = 1) {
+        val currentList = _cartItems.value.toMutableList()
+        val index = currentList.indexOfFirst { it.product.id == product.id }
+        if (index >= 0) {
+            val existing = currentList[index]
+            val newQty = (existing.quantity + quantity).coerceAtMost(999)
+            currentList[index] = existing.copy(quantity = newQty)
+        } else {
+            currentList.add(CartItem(product = product, quantity = quantity.coerceAtLeast(1)))
+        }
+        _cartItems.value = currentList
+        closeSaleDialog()
+    }
+
+    fun updateCartItemQuantity(productId: String, delta: Int) {
+        val currentList = _cartItems.value.toMutableList()
+        val index = currentList.indexOfFirst { it.product.id == productId }
+        if (index >= 0) {
+            val existing = currentList[index]
+            val newQty = existing.quantity + delta
+            if (newQty <= 0) {
+                currentList.removeAt(index)
+            } else {
+                currentList[index] = existing.copy(quantity = newQty.coerceAtMost(999))
+            }
+            _cartItems.value = currentList
+        }
+    }
+
+    fun removeCartItem(productId: String) {
+        _cartItems.value = _cartItems.value.filter { it.product.id != productId }
+    }
+
+    fun clearCart() {
+        _cartItems.value = emptyList()
+    }
+
+    /**
+     * Checkout all items in the cart at once
+     */
+    fun checkoutCart() {
+        val items = _cartItems.value
+        if (items.isEmpty()) return
+
+        val now = System.currentTimeMillis()
+        val todayStr = Formatters.getTodayIsoString()
+        val totalRevenue = items.sumOf { it.totalPriceRiel }
+        val totalQty = items.sumOf { it.quantity }
+
+        val records = items.mapIndexed { idx, item ->
+            SaleRecord(
+                id = now + idx,
+                productId = item.product.id,
+                productName = item.product.nameKh,
+                unitPrice = item.product.priceRiel,
+                quantity = item.quantity,
+                totalPrice = item.totalPriceRiel,
+                timestamp = now,
+                dateString = todayStr
+            )
+        }
+
+        val summaries = items.map { "${it.product.iconEmoji} ${it.product.nameKh} x${it.quantity}" }
+
+        viewModelScope.launch {
+            repository.recordSales(records)
+            _cartItems.value = emptyList()
+
+            _lastSaleSuccess.value = SaleSuccessEvent(
+                productName = if (items.size == 1) items.first().product.nameKh else "ការទូទាត់ ${items.size} មុខទំនិញ",
+                quantity = totalQty,
+                totalAmount = totalRevenue,
+                itemsSummary = summaries
+            )
+
+            // Auto sync to Google Drive if configured
+            val config = _cloudConfig.value
+            if (config.autoSyncOnSale && config.googleDriveScriptUrl.isNotBlank() && _isOnline.value) {
+                pushSalesToGoogleDriveSilent()
+            }
+        }
+    }
+
+    /**
+     * Instant single-item sell without going through cart
+     */
+    fun quickSellSingle() {
         val product = _activeProductForSale.value ?: return
         val qty = _activeQuantity.value.coerceAtLeast(1)
         val totalPrice = product.priceRiel * qty
         val todayStr = Formatters.getTodayIsoString()
+        val now = System.currentTimeMillis()
 
         val record = SaleRecord(
+            id = now,
             productId = product.id,
             productName = product.nameKh,
             unitPrice = product.priceRiel,
             quantity = qty,
             totalPrice = totalPrice,
-            timestamp = System.currentTimeMillis(),
+            timestamp = now,
             dateString = todayStr
         )
 
@@ -230,10 +347,17 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
             _lastSaleSuccess.value = SaleSuccessEvent(
                 productName = product.nameKh,
                 quantity = qty,
-                totalAmount = totalPrice
+                totalAmount = totalPrice,
+                itemsSummary = listOf("${product.iconEmoji} ${product.nameKh} x$qty")
             )
             _activeProductForSale.value = null
             _activeQuantity.value = 1
+
+            // Auto sync to Google Drive if configured
+            val config = _cloudConfig.value
+            if (config.autoSyncOnSale && config.googleDriveScriptUrl.isNotBlank() && _isOnline.value) {
+                pushSalesToGoogleDriveSilent()
+            }
         }
     }
 
@@ -264,8 +388,13 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.recordDailyClosure(closure)
 
-            // If Telegram Bot is configured, automatically send closure report
+            // Auto sync closure to Google Drive
             val config = _cloudConfig.value
+            if (config.googleDriveScriptUrl.isNotBlank() && _isOnline.value) {
+                pushSalesToGoogleDriveSilent()
+            }
+
+            // If Telegram Bot is configured, automatically send closure report
             if (config.telegramBotToken.isNotBlank() && config.telegramChatId.isNotBlank()) {
                 val reportText = TelegramHelper.generateReportText(
                     dateIso = dateString,
@@ -289,7 +418,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     fun updateCloudConfig(config: CloudConfig) {
         _cloudConfig.value = config
         CloudSyncManager.saveConfig(getApplication(), config)
-        _feedbackMessage.value = SyncFeedbackMessage("បានរក្សាទុកការកំណត់ Cloud & Telegram រួចរាល់", true)
+        _feedbackMessage.value = SyncFeedbackMessage("បានរក្សាទុកការកំណត់ Google Drive & Telegram រួចរាល់", true)
     }
 
     fun clearFeedback() {
@@ -325,7 +454,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
                 message = reportText
             )
 
-            result.onSuccess { msg ->
+            result.onSuccess {
                 _syncState.value = SyncState.SUCCESS
                 _feedbackMessage.value = SyncFeedbackMessage("ផ្ញើរបាយការណ៍ទៅ Telegram បានជោគជ័យ!", true)
             }.onFailure { err ->
@@ -335,44 +464,72 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun syncDataToCloud() {
+    // --- GOOGLE DRIVE SHARED DATABASE SYNC ---
+
+    /**
+     * 2-Way Sync with Google Drive:
+     * 1. Pulls all remote sales and closures from Google Drive and merges into local DB
+     * 2. Pushes all local sales and closures to Google Drive
+     */
+    fun syncWithGoogleDrive(silent: Boolean = false) {
         val config = _cloudConfig.value
         refreshNetworkStatus()
 
         if (!_isOnline.value) {
-            _feedbackMessage.value = SyncFeedbackMessage("គ្មានការតភ្ជាប់អ៊ីនធឺណិតទេ (Offline)", false)
+            if (!silent) _feedbackMessage.value = SyncFeedbackMessage("គ្មានការតភ្ជាប់អ៊ីនធឺណិតទេ (Offline)", false)
+            return
+        }
+
+        if (config.googleDriveScriptUrl.isBlank()) {
+            if (!silent) _feedbackMessage.value = SyncFeedbackMessage("សូមកំណត់ Google Drive Script URL ជាមុនសិន", false)
             return
         }
 
         viewModelScope.launch {
             _syncState.value = SyncState.SYNCING
+
+            // 1. Pull remote records from Google Drive
+            val pullResult = CloudSyncManager.pullFromGoogleDrive(config.googleDriveScriptUrl)
+            pullResult.onSuccess { data ->
+                if (data.newSales.isNotEmpty()) {
+                    repository.recordSales(data.newSales)
+                }
+                data.newClosures.forEach { closure ->
+                    repository.recordDailyClosure(closure)
+                }
+            }
+
+            // 2. Push current local dataset to Google Drive
             val allSales = repository.getAllSales().first()
             val allClosures = repository.getAllDailyClosures().first()
 
-            val jsonPayload = CloudSyncManager.exportSalesToJson(allSales, allClosures)
-
-            if (config.cloudWebhookUrl.isNotBlank()) {
-                val result = CloudSyncManager.syncToRemoteCloud(config.cloudWebhookUrl, jsonPayload)
-                result.onSuccess {
-                    val now = System.currentTimeMillis()
-                    val updated = config.copy(lastSyncTimestamp = now)
-                    _cloudConfig.value = updated
-                    CloudSyncManager.saveConfig(getApplication(), updated)
-                    _syncState.value = SyncState.SUCCESS
-                    _feedbackMessage.value = SyncFeedbackMessage("ទិន្នន័យត្រូវបាន Sync ឡើង Cloud ជោគជ័យ!", true)
-                }.onFailure { err ->
-                    _syncState.value = SyncState.ERROR
-                    _feedbackMessage.value = SyncFeedbackMessage("Sync មិនបានសម្រេច: ${err.message}", false)
-                }
-            } else {
-                // Local Cloud backup simulation timestamp
+            val pushResult = CloudSyncManager.pushToGoogleDrive(config.googleDriveScriptUrl, allSales, allClosures)
+            pushResult.onSuccess {
                 val now = System.currentTimeMillis()
                 val updated = config.copy(lastSyncTimestamp = now)
                 _cloudConfig.value = updated
                 CloudSyncManager.saveConfig(getApplication(), updated)
                 _syncState.value = SyncState.SUCCESS
-                _feedbackMessage.value = SyncFeedbackMessage("បាន Sync និង Backup ទិន្នន័យ ${allSales.size} វិក្កយបត្ររួចរាល់!", true)
+                if (!silent) {
+                    _feedbackMessage.value = SyncFeedbackMessage("Sync ជាមួយ Google Drive Database ជោគជ័យ (${allSales.size} វិក្កយបត្រ)", true)
+                }
+            }.onFailure { err ->
+                _syncState.value = SyncState.ERROR
+                if (!silent) {
+                    _feedbackMessage.value = SyncFeedbackMessage("Sync Google Drive មិនបានសម្រេច: ${err.message}", false)
+                }
             }
+        }
+    }
+
+    private suspend fun pushSalesToGoogleDriveSilent() {
+        try {
+            val config = _cloudConfig.value
+            val allSales = repository.getAllSales().first()
+            val allClosures = repository.getAllDailyClosures().first()
+            CloudSyncManager.pushToGoogleDrive(config.googleDriveScriptUrl, allSales, allClosures)
+        } catch (_: Exception) {
+            // Background silent push
         }
     }
 }
