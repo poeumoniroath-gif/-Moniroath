@@ -42,6 +42,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +71,7 @@ fun CartSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showCheckoutConfirm by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -224,7 +229,7 @@ fun CartSheet(
 
                 // Confirm Sale / Pay Button
                 Button(
-                    onClick = onConfirmCheckout,
+                    onClick = { showCheckoutConfirm = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -253,6 +258,99 @@ fun CartSheet(
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
+    }
+
+    // Checkout Confirmation Dialog
+    if (showCheckoutConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCheckoutConfirm = false },
+            icon = {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFD1FAE5),
+                    modifier = Modifier.size(54.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCartCheckout,
+                            contentDescription = null,
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+            },
+            title = {
+                Text(
+                    text = "បញ្ជាក់ការទូទាត់កន្ត្រក?",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "តើអ្នកចង់កត់ត្រាការលក់ទំនិញទាំង ${totalItems} កែវ នេះមែនទេ?",
+                        fontSize = 14.sp,
+                        color = Color(0xFF64748B),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF1F5F9),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("ទឹកប្រាក់សរុប:", fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
+                            Text(
+                                Formatters.formatRiel(totalRiel),
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF059669),
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCheckoutConfirm = false
+                        onConfirmCheckout()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF059669),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("confirm_checkout_action")
+                ) {
+                    Text("យល់ព្រមលក់", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showCheckoutConfirm = false },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("cancel_checkout_action")
+                ) {
+                    Text("បោះបង់", color = Color(0xFF64748B))
+                }
+            }
+        )
     }
 }
 

@@ -17,10 +17,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddShoppingCart
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCartCheckout
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -33,13 +36,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -59,6 +68,7 @@ fun SaleConfirmDialog(
     onDismiss: () -> Unit
 ) {
     val totalAmount = product.priceRiel * quantity
+    var showDoubleConfirmAlert by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -306,7 +316,7 @@ fun SaleConfirmDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Dual Action Buttons: Add To Cart (Primary) & Quick Checkout
+                // Dual Action Buttons: Add To Cart (Primary) & Quick Checkout (Triggers confirmation)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -337,9 +347,9 @@ fun SaleConfirmDialog(
                         )
                     }
 
-                    // Quick Sell Button
+                    // Quick Sell Button -> Opens Double Confirmation
                     Button(
-                        onClick = onQuickConfirm,
+                        onClick = { showDoubleConfirmAlert = true },
                         modifier = Modifier
                             .weight(1.1f)
                             .height(52.dp)
@@ -365,5 +375,143 @@ fun SaleConfirmDialog(
                 }
             }
         }
+    }
+
+    // Double Confirmation Alert to avoid accidental sells
+    if (showDoubleConfirmAlert) {
+        AlertDialog(
+            onDismissRequest = { showDoubleConfirmAlert = false },
+            icon = {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFFEF3C7),
+                    modifier = Modifier.size(54.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = Color(0xFFD97706),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            },
+            title = {
+                Text(
+                    text = "បញ្ជាក់ការលក់ភ្លាមៗ?",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "តើអ្នកពិតជាចង់កត់ត្រាការលក់នេះមែនទេ?",
+                        fontSize = 14.sp,
+                        color = Color(0xFF64748B),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = product.iconEmoji, fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = product.nameKh,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1E293B),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                Text(
+                                    text = "$quantity កែវ",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "ទឹកប្រាក់សរុប:",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                                Text(
+                                    text = Formatters.formatRiel(totalAmount),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF059669),
+                                    fontSize = 16.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDoubleConfirmAlert = false
+                        onQuickConfirm()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF059669),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("confirm_immediate_sale_action")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "យល់ព្រមលក់",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDoubleConfirmAlert = false },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("cancel_immediate_sale_action")
+                ) {
+                    Text(
+                        text = "បោះបង់",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+        )
     }
 }
