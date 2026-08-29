@@ -13,5 +13,6 @@ data class SaleRecord(
     val quantity: Int,
     val totalPrice: Int,
     val timestamp: Long = System.currentTimeMillis(),
-    val dateString: String // e.g. "2026-08-25"
+    val dateString: String, // e.g. "2026-08-25"
+    val paymentMethod: String = "CASH" // "CASH" or "ABA"
 )

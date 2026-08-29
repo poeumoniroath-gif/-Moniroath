@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.model.PaymentMethod
 import com.example.model.Product
 import com.example.util.Formatters
 
@@ -64,10 +65,11 @@ fun SaleConfirmDialog(
     onDecrement: () -> Unit,
     onSelectQuickQty: (Int) -> Unit,
     onAddToCart: () -> Unit,
-    onQuickConfirm: () -> Unit,
+    onQuickConfirm: (PaymentMethod) -> Unit,
     onDismiss: () -> Unit
 ) {
     val totalAmount = product.priceRiel * quantity
+    var selectedPaymentMethod by remember { mutableStateOf(PaymentMethod.CASH) }
     var showDoubleConfirmAlert by remember { mutableStateOf(false) }
 
     Dialog(
@@ -275,6 +277,56 @@ fun SaleConfirmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Payment Method Selector (Cash vs ABA)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "វិធីទូទាត់ប្រាក់ (Payment Method):",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        PaymentMethod.values().forEach { method ->
+                            val isSelected = selectedPaymentMethod == method
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) Color(method.colorHex).copy(alpha = 0.15f) else Color(0xFFF1F5F9),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    if (isSelected) 2.dp else 1.dp,
+                                    if (isSelected) Color(method.colorHex) else Color(0xFFCBD5E1)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { selectedPaymentMethod = method }
+                                    .testTag("payment_method_${method.code}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(text = method.iconEmoji, fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = method.nameKh,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) Color(method.colorHex) else Color(0xFF475569)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Subtotal Calculation Box
                 Box(
                     modifier = Modifier
@@ -459,6 +511,30 @@ fun SaleConfirmDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
+                                    text = "វិធីទូទាត់:",
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(selectedPaymentMethod.colorHex).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${selectedPaymentMethod.iconEmoji} ${selectedPaymentMethod.nameKh}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(selectedPaymentMethod.colorHex),
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
                                     text = "ទឹកប្រាក់សរុប:",
                                     fontSize = 13.sp,
                                     color = Color(0xFF64748B)
@@ -478,7 +554,7 @@ fun SaleConfirmDialog(
                 Button(
                     onClick = {
                         showDoubleConfirmAlert = false
-                        onQuickConfirm()
+                        onQuickConfirm(selectedPaymentMethod)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF059669),

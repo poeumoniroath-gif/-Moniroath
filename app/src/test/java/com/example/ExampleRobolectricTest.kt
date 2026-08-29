@@ -33,13 +33,15 @@ class ExampleRobolectricTest {
         quantity = 2,
         totalPrice = 8000,
         timestamp = 1700000000000L,
-        dateString = "2026-08-27"
+        dateString = "2026-08-27",
+        paymentMethod = "ABA"
       )
     )
     val json = CloudSyncManager.exportSalesToJson(sales, emptyList())
     assertTrue(json.contains("Jolly Slushie POS"))
     assertTrue(json.contains("slushie"))
     assertTrue(json.contains("8000"))
+    assertTrue(json.contains("ABA"))
   }
 }
 

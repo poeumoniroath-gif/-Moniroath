@@ -34,6 +34,8 @@ object TelegramHelper {
         dailyClosure: DailyClosureRecord?
     ): String {
         val totalRevenue = sales.sumOf { it.totalPrice.toLong() }
+        val cashRevenue = sales.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+        val abaRevenue = sales.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
         val totalItems = sales.sumOf { it.quantity }
         val totalTransactions = sales.size
         val dateKhmer = Formatters.formatDateToKhmer(dateIso)
@@ -46,6 +48,8 @@ object TelegramHelper {
         builder.append("⏰ ពេលវេលាផ្ញើ: $nowTime\n\n")
 
         builder.append("💰 ចំណូលសរុប: ${Formatters.formatRiel(totalRevenue)}\n")
+        builder.append("  💵 សាច់ប្រាក់ (Cash): ${Formatters.formatRiel(cashRevenue)}\n")
+        builder.append("  📲 ABA Pay (ABA): ${Formatters.formatRiel(abaRevenue)}\n\n")
         builder.append("🥤 ចំនួនកែវលក់សរុប: $totalItems កែវ\n")
         builder.append("🧾 ចំនួនវិក្កយបត្រ: $totalTransactions លើក\n\n")
 

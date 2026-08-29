@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.SaleRecord
+import com.example.model.PaymentMethod
 import com.example.model.ProductCatalog
 import com.example.ui.SalesViewModel
 import com.example.util.Formatters
@@ -307,7 +308,8 @@ fun HistorySaleItemCard(
                 }
             }
 
-            // Right: Qty + Total Amount + Permanent Lock Indicator
+            // Right: Qty + Total Amount + Payment Method + Permanent Lock Indicator
+            val payment = PaymentMethod.fromCode(sale.paymentMethod)
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = Formatters.formatRiel(sale.totalPrice),
@@ -316,27 +318,40 @@ fun HistorySaleItemCard(
                     color = Color(0xFF059669)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFEFF6FF)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Payment Method Badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(payment.colorHex).copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = "ចំនួន: ${sale.quantity}",
-                            fontSize = 11.sp,
+                            text = "${payment.iconEmoji} ${payment.nameKh}",
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1D4ED8)
+                            color = Color(payment.colorHex),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "ជាប់ថេរ",
-                            tint = Color(0xFF64748B),
-                            modifier = Modifier.size(10.dp)
-                        )
+                    }
+
+                    // Quantity Badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFEFF6FF)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${sale.quantity} កែវ",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1D4ED8)
+                            )
+                        }
                     }
                 }
             }

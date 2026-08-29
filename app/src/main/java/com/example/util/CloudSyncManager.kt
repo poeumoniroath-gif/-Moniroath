@@ -57,17 +57,36 @@ object CloudSyncManager {
     const val GOOGLE_APPS_SCRIPT_SAMPLE = """
 /**
  * Google Apps Script for Jolly Slushie POS - Google Drive Shared Database
- * Instructions:
- * 1. Go to https://script.google.com or open a Google Sheet in Google Drive.
- * 2. Click Extensions -> Apps Script.
- * 3. Paste this entire code into Code.gs.
- * 4. Click Deploy -> New deployment -> Select type: Web App.
- * 5. Set 'Execute as': 'Me' and 'Who has access': 'Anyone'.
- * 6. Click Deploy, copy the Web App URL and paste it into the POS App Google Drive URL.
+ * 
+ * របៀបដំឡើង (Instructions):
+ * 1. បើក Google Sheet របស់អ្នក -> ចុច Extensions -> Apps Script
+ *    (ឬបើក script.google.com រួចដាក់ SPREADSHEET_ID នៃ Google Sheet របស់អ្នកខាងក្រោម)
+ * 2. Paste កូដនេះចូលក្នុង Code.gs រួចចុច Save (💾)
+ * 3. ចុច Deploy -> New deployment -> Select type: Web app
+ * 4. Execute as: "Me" | Who has access: "Anyone"
+ * 5. ចុច Deploy រួច Copy យក Web App URL មកដាក់ក្នុង App POS
  */
 
+// ប្រសិនបើបង្កើត Script ដាច់ដោយឡែក សូមដាក់ Google Sheet ID នៅទីនេះ (ទុកទទេបើបើកតាម Extensions -> Apps Script):
+var SPREADSHEET_ID = ""; 
+
+function getSpreadsheet() {
+  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
+    return SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+  }
+  var active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+  
+  // ស្វែងរក Sheet ដែលមានស្រាប់ ឬបង្កើតថ្មី
+  var files = DriveApp.getFilesByName("Jolly Slushie POS Database");
+  if (files.hasNext()) {
+    return SpreadsheetApp.open(files.next());
+  }
+  return SpreadsheetApp.create("Jolly Slushie POS Database");
+}
+
 function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create("Jolly Slushie POS Database");
+  var ss = getSpreadsheet();
   var salesSheet = ss.getSheetByName("Sales") || ss.insertSheet("Sales");
   var closuresSheet = ss.getSheetByName("Closures") || ss.insertSheet("Closures");
   
@@ -119,12 +138,12 @@ function doPost(e) {
   try {
     var contents = e.postData.contents;
     var data = JSON.parse(contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create("Jolly Slushie POS Database");
+    var ss = getSpreadsheet();
     
     // Save/Update Sales Sheet
     var salesSheet = ss.getSheetByName("Sales") || ss.insertSheet("Sales");
     if (salesSheet.getLastRow() === 0) {
-      salesSheet.appendRow(["id", "productId", "productName", "unitPrice", "quantity", "totalPrice", "timestamp", "dateString"]);
+      salesSheet.appendRow(["id", "productId", "productName", "unitPrice", "quantity", "totalPrice", "timestamp", "dateString", "paymentMethod"]);
     }
     
     var existingSales = salesSheet.getDataRange().getValues();
@@ -137,7 +156,7 @@ function doPost(e) {
     for (var k = 0; k < incomingSales.length; k++) {
       var s = incomingSales[k];
       if (!existingIds[s.id]) {
-        salesSheet.appendRow([s.id, s.productId, s.productName, s.unitPrice, s.quantity, s.totalPrice, s.timestamp, s.dateString]);
+        salesSheet.appendRow([s.id, s.productId, s.productName, s.unitPrice, s.quantity, s.totalPrice, s.timestamp, s.dateString, s.paymentMethod || "CASH"]);
         existingIds[s.id] = true;
       }
     }
@@ -150,13 +169,13 @@ function doPost(e) {
     
     var existingClosures = closuresSheet.getDataRange().getValues();
     var existingDates = {};
-    for (var m = 1; m < existingClosures.length; m++) {
-      existingDates[existingClosures[m][0]] = true;
+    for (var n = 1; n < existingClosures.length; n++) {
+      existingDates[existingClosures[n][0]] = true;
     }
     
     var incomingClosures = data.dailyClosures || [];
-    for (var n = 0; n < incomingClosures.length; n++) {
-      var c = incomingClosures[n];
+    for (var m = 0; m < incomingClosures.length; m++) {
+      var c = incomingClosures[m];
       if (!existingDates[c.dateString]) {
         closuresSheet.appendRow([c.dateString, c.closedAtTimestamp, c.totalRevenue, c.totalItems, c.totalTransactions, c.notes]);
         existingDates[c.dateString] = true;
@@ -227,6 +246,7 @@ function doPost(e) {
                 put("totalPrice", sale.totalPrice)
                 put("timestamp", sale.timestamp)
                 put("dateString", sale.dateString)
+                put("paymentMethod", sale.paymentMethod)
             }
             salesArray.put(sObj)
         }
@@ -319,7 +339,8 @@ function doPost(e) {
                             quantity = item.optInt("quantity", 1),
                             totalPrice = item.optInt("totalPrice"),
                             timestamp = item.optLong("timestamp", System.currentTimeMillis()),
-                            dateString = item.optString("dateString")
+                            dateString = item.optString("dateString"),
+                            paymentMethod = item.optString("paymentMethod", "CASH")
                         )
                     )
                 }

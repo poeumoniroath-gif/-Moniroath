@@ -161,6 +161,32 @@ fun SaleSuccessDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
+                                    text = "វិធីទូទាត់:",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF166534)
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(event.paymentMethod.colorHex).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${event.paymentMethod.iconEmoji} ${event.paymentMethod.nameKh}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(event.paymentMethod.colorHex),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
                                     text = "សរុបទឹកប្រាក់",
                                     fontSize = 14.sp,
                                     color = Color(0xFF166534)

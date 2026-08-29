@@ -8,6 +8,7 @@ import com.example.data.DailyClosureRecord
 import com.example.data.SaleRecord
 import com.example.data.SalesRepository
 import com.example.model.CartItem
+import com.example.model.PaymentMethod
 import com.example.model.Product
 import com.example.model.ProductCatalog
 import com.example.model.ProductCategory
@@ -37,6 +38,7 @@ data class SaleSuccessEvent(
     val productName: String,
     val quantity: Int,
     val totalAmount: Int,
+    val paymentMethod: PaymentMethod = PaymentMethod.CASH,
     val itemsSummary: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis()
 )
@@ -161,6 +163,22 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val selectedDateCashRevenue: StateFlow<Long> = selectedDateSales.map { list ->
+        list.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0L
+    )
+
+    val selectedDateAbaRevenue: StateFlow<Long> = selectedDateSales.map { list ->
+        list.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0L
+    )
+
     // Selected Date Product Breakdown Summary
     val selectedDateProductSummaries: StateFlow<List<ProductSaleSummary>> = selectedDateSales.map { sales ->
         val group = sales.groupBy { it.productId }
@@ -278,7 +296,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Checkout all items in the cart at once
      */
-    fun checkoutCart() {
+    fun checkoutCart(paymentMethod: PaymentMethod = PaymentMethod.CASH) {
         val items = _cartItems.value
         if (items.isEmpty()) return
 
@@ -296,7 +314,8 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
                 quantity = item.quantity,
                 totalPrice = item.totalPriceRiel,
                 timestamp = now,
-                dateString = todayStr
+                dateString = todayStr,
+                paymentMethod = paymentMethod.code
             )
         }
 
@@ -310,6 +329,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
                 productName = if (items.size == 1) items.first().product.nameKh else "ការទូទាត់ ${items.size} មុខទំនិញ",
                 quantity = totalQty,
                 totalAmount = totalRevenue,
+                paymentMethod = paymentMethod,
                 itemsSummary = summaries
             )
 
@@ -324,7 +344,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Instant single-item sell without going through cart
      */
-    fun quickSellSingle() {
+    fun quickSellSingle(paymentMethod: PaymentMethod = PaymentMethod.CASH) {
         val product = _activeProductForSale.value ?: return
         val qty = _activeQuantity.value.coerceAtLeast(1)
         val totalPrice = product.priceRiel * qty
@@ -339,7 +359,8 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
             quantity = qty,
             totalPrice = totalPrice,
             timestamp = now,
-            dateString = todayStr
+            dateString = todayStr,
+            paymentMethod = paymentMethod.code
         )
 
         viewModelScope.launch {
@@ -348,6 +369,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
                 productName = product.nameKh,
                 quantity = qty,
                 totalAmount = totalPrice,
+                paymentMethod = paymentMethod,
                 itemsSummary = listOf("${product.iconEmoji} ${product.nameKh} x$qty")
             )
             _activeProductForSale.value = null

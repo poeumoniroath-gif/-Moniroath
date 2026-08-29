@@ -78,6 +78,8 @@ fun ReportScreen(
     val selectedDate by viewModel.selectedReportDate.collectAsStateWithLifecycle()
     val allDates by viewModel.allSaleDates.collectAsStateWithLifecycle()
     val sales by viewModel.selectedDateSales.collectAsStateWithLifecycle()
+    val cashRevenue by viewModel.selectedDateCashRevenue.collectAsStateWithLifecycle()
+    val abaRevenue by viewModel.selectedDateAbaRevenue.collectAsStateWithLifecycle()
     val productSummaries by viewModel.selectedDateProductSummaries.collectAsStateWithLifecycle()
     val dailyClosure by viewModel.selectedDateClosure.collectAsStateWithLifecycle()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
@@ -259,13 +261,41 @@ fun ReportScreen(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Revenue Card
                 KpiCard(
-                    title = "ប្រាក់ចំណូលសរុប",
+                    title = "ប្រាក់ចំណូលសរុប (Total Revenue)",
                     value = Formatters.formatRiel(totalRevenue),
                     icon = Icons.Default.MonetizationOn,
                     backgroundColor = Color(0xFF0F172A),
                     contentColor = Color(0xFFFFD54F),
                     titleColor = Color(0xFF94A3B8)
                 )
+
+                // Payment Method Breakdown Cards: Cash & ABA
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        KpiCard(
+                            title = "សាច់ប្រាក់ (Cash)",
+                            value = Formatters.formatRiel(cashRevenue),
+                            emoji = "💵",
+                            backgroundColor = Color(0xFFF0FDF4),
+                            contentColor = Color(0xFF059669),
+                            titleColor = Color(0xFF166534)
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        KpiCard(
+                            title = "ABA Pay (ABA)",
+                            value = Formatters.formatRiel(abaRevenue),
+                            emoji = "📲",
+                            backgroundColor = Color(0xFFF0F9FF),
+                            contentColor = Color(0xFF0284C7),
+                            titleColor = Color(0xFF075985)
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -702,7 +732,8 @@ fun ReportScreen(
 fun KpiCard(
     title: String,
     value: String,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    emoji: String? = null,
     backgroundColor: Color,
     contentColor: Color,
     titleColor: Color,
@@ -731,12 +762,16 @@ fun KpiCard(
                     fontWeight = FontWeight.Medium,
                     color = titleColor
                 )
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = contentColor.copy(alpha = 0.8f),
-                    modifier = Modifier.size(18.dp)
-                )
+                if (emoji != null) {
+                    Text(text = emoji, fontSize = 18.sp)
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = contentColor.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

@@ -259,7 +259,7 @@ fun SaleScreen(
                 onDecrement = { viewModel.decrementQuantity() },
                 onSelectQuickQty = { qty -> viewModel.setQuantity(qty) },
                 onAddToCart = { viewModel.addToCart(product, activeQuantity) },
-                onQuickConfirm = { viewModel.quickSellSingle() },
+                onQuickConfirm = { paymentMethod -> viewModel.quickSellSingle(paymentMethod) },
                 onDismiss = { viewModel.closeSaleDialog() }
             )
         }
@@ -274,9 +274,9 @@ fun SaleScreen(
                 onDecrement = { id -> viewModel.updateCartItemQuantity(id, -1) },
                 onRemove = { id -> viewModel.removeCartItem(id) },
                 onClearCart = { viewModel.clearCart() },
-                onConfirmCheckout = {
+                onConfirmCheckout = { paymentMethod ->
                     showCartSheet = false
-                    viewModel.checkoutCart()
+                    viewModel.checkoutCart(paymentMethod)
                 },
                 onDismiss = { showCartSheet = false }
             )

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.CartItem
+import com.example.model.PaymentMethod
 import com.example.util.Formatters
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,10 +68,11 @@ fun CartSheet(
     onDecrement: (String) -> Unit,
     onRemove: (String) -> Unit,
     onClearCart: () -> Unit,
-    onConfirmCheckout: () -> Unit,
+    onConfirmCheckout: (PaymentMethod) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var selectedPaymentMethod by remember { mutableStateOf(PaymentMethod.CASH) }
     var showCheckoutConfirm by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -227,6 +229,56 @@ fun CartSheet(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Payment Method Selector in Cart (Cash vs ABA)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "វិធីទូទាត់ប្រាក់:",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        PaymentMethod.values().forEach { method ->
+                            val isSelected = selectedPaymentMethod == method
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) Color(method.colorHex).copy(alpha = 0.15f) else Color(0xFFF1F5F9),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    if (isSelected) 2.dp else 1.dp,
+                                    if (isSelected) Color(method.colorHex) else Color(0xFFCBD5E1)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { selectedPaymentMethod = method }
+                                    .testTag("cart_payment_method_${method.code}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(text = method.iconEmoji, fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = method.nameKh,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) Color(method.colorHex) else Color(0xFF475569)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Confirm Sale / Pay Button
                 Button(
                     onClick = { showCheckoutConfirm = true },
@@ -307,20 +359,44 @@ fun CartSheet(
                         color = Color(0xFFF1F5F9),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("ទឹកប្រាក់សរុប:", fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
-                            Text(
-                                Formatters.formatRiel(totalRiel),
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFF059669),
-                                fontSize = 16.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("វិធីទូទាត់:", fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(selectedPaymentMethod.colorHex).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${selectedPaymentMethod.iconEmoji} ${selectedPaymentMethod.nameKh}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(selectedPaymentMethod.colorHex),
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("ទឹកប្រាក់សរុប:", fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
+                                Text(
+                                    Formatters.formatRiel(totalRiel),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF059669),
+                                    fontSize = 16.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -329,7 +405,7 @@ fun CartSheet(
                 Button(
                     onClick = {
                         showCheckoutConfirm = false
-                        onConfirmCheckout()
+                        onConfirmCheckout(selectedPaymentMethod)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF059669),
