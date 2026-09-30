@@ -24,20 +24,26 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Accept Android SDK Licenses & Install Components
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" "platform-tools" || true
+          SDK_MGR=""
+          if command -v sdkmanager >/dev/null 2>&1; then
+            SDK_MGR="sdkmanager"
+          elif [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDK_MGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          if [ -n "$SDK_MGR" ]; then
+            yes | $SDK_MGR --licenses || true
+            $SDK_MGR "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" "platform-tools" || true
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      - name: Prepare Build Keys and Environment
+      - name: Prepare Build Environment & Keys
         run: |
           touch .env
           touch .env.example
@@ -51,8 +57,7 @@ jobs:
 
       - name: Build APK with Gradle
         run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m"
+          gradle :app:assembleDebug --stacktrace --no-daemon -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
