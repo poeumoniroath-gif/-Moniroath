@@ -107,6 +107,17 @@ fun ReportScreen(
     val weeklyDailyBreakdown by viewModel.weeklyDailyBreakdown.collectAsStateWithLifecycle()
     val weeklyProductSummaries by viewModel.weeklyProductSummaries.collectAsStateWithLifecycle()
 
+    // Monthly States
+    val selectedMonthYear by viewModel.selectedMonthYear.collectAsStateWithLifecycle()
+    val selectedMonth by viewModel.selectedMonth.collectAsStateWithLifecycle()
+    val monthlyRevenue by viewModel.monthlyRevenue.collectAsStateWithLifecycle()
+    val monthlyCashRevenue by viewModel.monthlyCashRevenue.collectAsStateWithLifecycle()
+    val monthlyAbaRevenue by viewModel.monthlyAbaRevenue.collectAsStateWithLifecycle()
+    val monthlyItemsCount by viewModel.monthlyItemsCount.collectAsStateWithLifecycle()
+    val monthlyTransactionsCount by viewModel.monthlyTransactionsCount.collectAsStateWithLifecycle()
+    val monthlyDailyBreakdown by viewModel.monthlyDailyBreakdown.collectAsStateWithLifecycle()
+    val monthlyProductSummaries by viewModel.monthlyProductSummaries.collectAsStateWithLifecycle()
+
     // Annual States
     val selectedAnnualYear by viewModel.selectedAnnualYear.collectAsStateWithLifecycle()
     val annualRevenue by viewModel.annualRevenue.collectAsStateWithLifecycle()
@@ -634,6 +645,154 @@ fun ReportScreen(
                     ProductBreakdownCard(
                         title = "ទំនិញលក់ដាច់ប្រចាំសប្ដាហ៍ (Weekly Top Sellers)",
                         productSummaries = weeklyProductSummaries
+                    )
+                }
+            }
+
+            ReportPeriod.MONTHLY -> {
+                // Monthly Navigator Bar
+                item {
+                    val monthKhmerTitle = Formatters.formatMonthYearKhmer(selectedMonthYear, selectedMonth)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { viewModel.previousMonth() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month")
+                                }
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "របាយការណ៍ប្រចាំខែ (Monthly Report)",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = monthKhmerTitle,
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.nextMonth() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                OutlinedButton(
+                                    onClick = { viewModel.resetToCurrentMonth() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("ខែនេះ (This Month)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Monthly Summary KPI Cards
+                item {
+                    val activeDaysCount = monthlyDailyBreakdown.size.coerceAtLeast(1)
+                    val avgDaily = if (monthlyRevenue > 0L) monthlyRevenue / activeDaysCount else 0L
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        KpiCard(
+                            title = "ចំណូលសរុបប្រចាំខែ (Total Monthly Revenue)",
+                            value = Formatters.formatRiel(monthlyRevenue),
+                            subtitle = Formatters.formatUsd(monthlyRevenue),
+                            icon = Icons.Default.MonetizationOn,
+                            backgroundColor = Color(0xFF0F172A),
+                            contentColor = Color(0xFFFFD54F),
+                            titleColor = Color(0xFF94A3B8)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                KpiCard(
+                                    title = "មធ្យម/ថ្ងៃ (Avg Daily)",
+                                    value = Formatters.formatRiel(avgDaily),
+                                    icon = Icons.Default.TrendingUp,
+                                    backgroundColor = Color(0xFFFAF5FF),
+                                    contentColor = Color(0xFF9333EA),
+                                    titleColor = Color(0xFF6B21A8)
+                                )
+                            }
+
+                            Box(modifier = Modifier.weight(1f)) {
+                                KpiCard(
+                                    title = "ទំនិញលក់បាន",
+                                    value = "$monthlyItemsCount កែវ",
+                                    icon = Icons.Default.ShoppingBag,
+                                    backgroundColor = MaterialTheme.colorScheme.surface,
+                                    contentColor = Color(0xFF0284C7),
+                                    titleColor = Color(0xFF64748B)
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                KpiCard(
+                                    title = "សាច់ប្រាក់ (Cash)",
+                                    value = Formatters.formatRiel(monthlyCashRevenue),
+                                    emoji = "💵",
+                                    backgroundColor = Color(0xFFF0FDF4),
+                                    contentColor = Color(0xFF059669),
+                                    titleColor = Color(0xFF166534)
+                                )
+                            }
+
+                            Box(modifier = Modifier.weight(1f)) {
+                                KpiCard(
+                                    title = "ABA Pay",
+                                    value = Formatters.formatRiel(monthlyAbaRevenue),
+                                    emoji = "📲",
+                                    backgroundColor = Color(0xFFF0F9FF),
+                                    contentColor = Color(0xFF0284C7),
+                                    titleColor = Color(0xFF075985)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Monthly Daily Breakdown Card
+                item {
+                    MonthlyDayBreakdownCard(dailyBreakdown = monthlyDailyBreakdown)
+                }
+
+                // Monthly Top-Selling Products
+                item {
+                    ProductBreakdownCard(
+                        title = "ទំនិញលក់ដាច់ប្រចាំខែ (Monthly Top Sellers)",
+                        productSummaries = monthlyProductSummaries
                     )
                 }
             }
@@ -1249,6 +1408,154 @@ fun WeeklyBreakdownCard(
                                     color = Color(0xFF64748B),
                                     fontWeight = FontWeight.Medium
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthlyDayBreakdownCard(
+    dailyBreakdown: List<DaySalesStat>,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "ចំណូលតាមថ្ងៃក្នុងខែ (Daily Sales in Month)",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (dailyBreakdown.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "មិនទាន់មានការលក់ក្នុងខែនេះនៅឡើយទេ",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                val maxRevenue = dailyBreakdown.maxOfOrNull { it.revenue }?.coerceAtLeast(1L) ?: 1L
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    dailyBreakdown.forEach { dayStat ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (dayStat.isToday) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (dayStat.isToday) Color(0xFF93C5FD) else Color(0xFFE2E8F0)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = dayStat.dateIso,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (dayStat.isToday) Color(0xFF1D4ED8) else Color(0xFF1E293B)
+                                        )
+                                        if (dayStat.isToday) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFF2563EB)
+                                            ) {
+                                                Text(
+                                                    text = "ថ្ងៃនេះ",
+                                                    color = Color.White,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Text(
+                                        text = Formatters.formatRiel(dayStat.revenue),
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 14.sp,
+                                        color = if (dayStat.revenue > 0L) Color(0xFF059669) else Color(0xFF94A3B8)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val progress = (dayStat.revenue.toFloat() / maxRevenue.toFloat()).coerceIn(0.04f, 1f)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Color(0xFFE2E8F0))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(if (dayStat.revenue > 0L) progress else 0f)
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(if (dayStat.isToday) Color(0xFF2563EB) else Color(0xFF10B981))
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "ចំនួន ${dayStat.transactionsCount} លើក",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF64748B)
+                                    )
+                                    Text(
+                                        text = "លក់បាន ${dayStat.itemsCount} កែវ",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF64748B),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }

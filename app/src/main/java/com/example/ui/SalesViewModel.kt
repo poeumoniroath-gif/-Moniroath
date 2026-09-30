@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 enum class ReportPeriod(val titleKh: String, val titleEn: String, val iconEmoji: String) {
     DAILY("ប្រចាំថ្ងៃ", "Daily", "📅"),
     WEEKLY("ប្រចាំសប្ដាហ៍", "Weekly", "📊"),
+    MONTHLY("ប្រចាំខែ", "Monthly", "🗓️"),
     ANNUALLY("ប្រចាំឆ្នាំ", "Annually", "📈")
 }
 
@@ -406,6 +407,81 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val weeklyProductSummaries: StateFlow<List<ProductSaleSummary>> = combine(weeklySales, products) { sales, currentProducts ->
+        val group = sales.groupBy { it.productId }
+        currentProducts.mapNotNull { product ->
+            val matching = group[product.id]
+            if (matching != null && matching.isNotEmpty()) {
+                ProductSaleSummary(
+                    product = product,
+                    totalQuantity = matching.sumOf { it.quantity },
+                    totalAmount = matching.sumOf { it.totalPrice.toLong() }
+                )
+            } else null
+        }.sortedByDescending { it.totalAmount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- MONTHLY REPORT STATE FLOWS ---
+    private val _selectedMonthYear = MutableStateFlow(Formatters.getCurrentYear())
+    val selectedMonthYear: StateFlow<Int> = _selectedMonthYear.asStateFlow()
+
+    private val _selectedMonth = MutableStateFlow(Formatters.getCurrentMonth())
+    val selectedMonth: StateFlow<Int> = _selectedMonth.asStateFlow()
+
+    val monthlySales: StateFlow<List<SaleRecord>> = combine(
+        allSalesHistory,
+        _selectedMonthYear,
+        _selectedMonth
+    ) { allSales, year, month ->
+        val monthStr = String.format(Locale.US, "%02d", month)
+        val prefix = "$year-$monthStr"
+        allSales.filter { it.dateString.startsWith(prefix) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyRevenue: StateFlow<Long> = monthlySales.map { list -> list.sumOf { it.totalPrice.toLong() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val monthlyCashRevenue: StateFlow<Long> = monthlySales.map { list ->
+        list.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val monthlyAbaRevenue: StateFlow<Long> = monthlySales.map { list ->
+        list.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val monthlyItemsCount: StateFlow<Int> = monthlySales.map { list -> list.sumOf { it.quantity } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val monthlyTransactionsCount: StateFlow<Int> = monthlySales.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val monthlyDailyBreakdown: StateFlow<List<DaySalesStat>> = combine(
+        monthlySales,
+        _selectedMonthYear,
+        _selectedMonth
+    ) { sales, year, month ->
+        val salesByDate = sales.groupBy { it.dateString }
+        val activeDates = salesByDate.keys.sortedDescending()
+        activeDates.map { dateIso ->
+            val daySales = salesByDate[dateIso] ?: emptyList()
+            val dayOfMonth = dateIso.takeLast(2)
+            DaySalesStat(
+                dateIso = dateIso,
+                dayNameKhmer = "ថ្ងៃទី $dayOfMonth",
+                dayOfMonth = dayOfMonth,
+                revenue = daySales.sumOf { it.totalPrice.toLong() },
+                itemsCount = daySales.sumOf { it.quantity },
+                transactionsCount = daySales.size,
+                cashRevenue = daySales.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() },
+                abaRevenue = daySales.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() },
+                isToday = dateIso == Formatters.getTodayIsoString()
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val monthlyProductSummaries: StateFlow<List<ProductSaleSummary>> = combine(
+        monthlySales,
+        products
+    ) { sales, currentProducts ->
         val group = sales.groupBy { it.productId }
         currentProducts.mapNotNull { product ->
             val matching = group[product.id]
@@ -793,6 +869,27 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         _selectedWeeklyDate.value = Formatters.getTodayIsoString()
     }
 
+    fun previousMonth() {
+        val (yr, mo) = Formatters.shiftMonth(_selectedMonthYear.value, _selectedMonth.value, -1)
+        _selectedMonthYear.value = yr
+        _selectedMonth.value = mo
+    }
+
+    fun nextMonth() {
+        val (yr, mo) = Formatters.shiftMonth(_selectedMonthYear.value, _selectedMonth.value, 1)
+        _selectedMonthYear.value = yr
+        _selectedMonth.value = mo
+    }
+
+    fun resetToCurrentMonth() {
+        _selectedMonthYear.value = Formatters.getCurrentYear()
+        _selectedMonth.value = Formatters.getCurrentMonth()
+    }
+
+    fun selectMonth(month: Int) {
+        _selectedMonth.value = month.coerceIn(1, 12)
+    }
+
     fun selectAnnualYear(year: Int) {
         _selectedAnnualYear.value = year
     }
@@ -820,6 +917,14 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
                 val summaries = weeklyProductSummaries.value
                 val breakdown = weeklyDailyBreakdown.value.map { it.dayNameKhmer to it.revenue }
                 TelegramHelper.generateWeeklyReportText(startIso, endIso, sales, summaries, breakdown)
+            }
+            ReportPeriod.MONTHLY -> {
+                val year = _selectedMonthYear.value
+                val month = _selectedMonth.value
+                val sales = monthlySales.value
+                val summaries = monthlyProductSummaries.value
+                val breakdown = monthlyDailyBreakdown.value.map { it.dateIso to it.revenue }
+                TelegramHelper.generateMonthlyReportText(year, month, sales, summaries, breakdown)
             }
             ReportPeriod.ANNUALLY -> {
                 val year = _selectedAnnualYear.value

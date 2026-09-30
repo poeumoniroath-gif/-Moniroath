@@ -37,6 +37,24 @@ object Formatters {
         return cal.get(Calendar.YEAR)
     }
 
+    fun getCurrentMonth(): Int {
+        val cal = Calendar.getInstance(Locale.US)
+        return cal.get(Calendar.MONTH) + 1
+    }
+
+    fun shiftMonth(year: Int, month: Int, offset: Int): Pair<Int, Int> {
+        val cal = Calendar.getInstance(Locale.US)
+        cal.set(Calendar.YEAR, year)
+        cal.set(Calendar.MONTH, month - 1)
+        cal.set(Calendar.DAY_OF_MONTH, 1)
+        cal.add(Calendar.MONTH, offset)
+        return Pair(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+    }
+
+    fun formatMonthYearKhmer(year: Int, month: Int): String {
+        return "${getKhmerMonthName(month)} ឆ្នាំ $year"
+    }
+
     fun formatTimestampToIso(timestamp: Long): String {
         return dateIsoFormat.format(Date(timestamp))
     }

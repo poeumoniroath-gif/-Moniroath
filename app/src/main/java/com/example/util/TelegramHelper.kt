@@ -130,6 +130,63 @@ object TelegramHelper {
     }
 
     /**
+     * Formats a clean, readable monthly sales report
+     */
+    fun generateMonthlyReportText(
+        year: Int,
+        month: Int,
+        sales: List<SaleRecord>,
+        productSummaries: List<ProductSaleSummary>,
+        dailyBreakdown: List<Pair<String, Long>>
+    ): String {
+        val totalRevenue = sales.sumOf { it.totalPrice.toLong() }
+        val cashRevenue = sales.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+        val abaRevenue = sales.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+        val totalItems = sales.sumOf { it.quantity }
+        val totalTransactions = sales.size
+        val daysCount = dailyBreakdown.size.coerceAtLeast(1)
+        val avgDaily = if (sales.isNotEmpty()) totalRevenue / daysCount else 0L
+
+        val builder = StringBuilder()
+        builder.append("📊 របាយការណ៍លក់ប្រចាំខែ — JOLLY SLUSHIE\n")
+        builder.append("━━━━━━━━━━━━━━━━━━━━\n")
+        builder.append("📅 ខែ: ${Formatters.formatMonthYearKhmer(year, month)}\n")
+        builder.append("⏰ ពេលវេលាផ្ញើ: ${Formatters.formatTimestampToTime(System.currentTimeMillis())}\n\n")
+
+        builder.append("💰 ចំណូលសរុបប្រចាំខែ: ${Formatters.formatRiel(totalRevenue)} (${Formatters.formatUsd(totalRevenue)})\n")
+        builder.append("  💵 សាច់ប្រាក់ (Cash): ${Formatters.formatRiel(cashRevenue)}\n")
+        builder.append("  📲 ABA Pay (ABA): ${Formatters.formatRiel(abaRevenue)}\n")
+        builder.append("  📈 ចំណូលមធ្យម/ថ្ងៃ: ${Formatters.formatRiel(avgDaily)}\n\n")
+
+        builder.append("🥤 ចំនួនកែវលក់សរុប: $totalItems កែវ\n")
+        builder.append("🧾 ចំនួនវិក្កយបត្រ: $totalTransactions លើក\n\n")
+
+        builder.append("🗓️ ចំណូលតាមថ្ងៃក្នុងខែ:\n")
+        val activeDays = dailyBreakdown.filter { it.second > 0L }
+        if (activeDays.isEmpty()) {
+            builder.append("  (មិនទាន់មានចំណូលក្នុងខែនេះនៅឡើយទេ)\n")
+        } else {
+            activeDays.forEach { (dayDate, revenue) ->
+                builder.append("  • $dayDate: ${Formatters.formatRiel(revenue)}\n")
+            }
+        }
+
+        builder.append("\n🏆 ទំនិញលក់ដាច់បំផុតប្រចាំខែ:\n")
+        if (productSummaries.isEmpty()) {
+            builder.append("  (មិនទាន់មានការលក់)\n")
+        } else {
+            productSummaries.take(5).forEachIndexed { index, item ->
+                builder.append("${index + 1}. ${item.product.iconEmoji} ${item.product.nameKh}: ${item.totalQuantity} កែវ (${Formatters.formatRiel(item.totalAmount)})\n")
+            }
+        }
+
+        builder.append("\n━━━━━━━━━━━━━━━━━━━━\n")
+        builder.append("📍 ហាង Jolly Slushie")
+
+        return builder.toString()
+    }
+
+    /**
      * Formats a clean, readable annual sales report
      */
     fun generateAnnualReportText(
