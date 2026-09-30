@@ -27,21 +27,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -64,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.Product
-import com.example.model.ProductCatalog
 import com.example.model.ProductCategory
 import com.example.ui.SalesViewModel
 import com.example.ui.components.CartSheet
@@ -77,6 +71,10 @@ fun SaleScreen(
     viewModel: SalesViewModel,
     modifier: Modifier = Modifier
 ) {
+    val products by viewModel.products.collectAsStateWithLifecycle()
+    val lowStockProducts by viewModel.lowStockProducts.collectAsStateWithLifecycle()
+    val outOfStockProducts by viewModel.outOfStockProducts.collectAsStateWithLifecycle()
+
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val activeProduct by viewModel.activeProductForSale.collectAsStateWithLifecycle()
     val activeQuantity by viewModel.activeQuantity.collectAsStateWithLifecycle()
@@ -88,9 +86,9 @@ fun SaleScreen(
     var showCartSheet by remember { mutableStateOf(false) }
 
     val filteredProducts = if (selectedCategory == ProductCategory.ALL) {
-        ProductCatalog.items
+        products
     } else {
-        ProductCatalog.items.filter { it.category == selectedCategory }
+        products.filter { it.category == selectedCategory }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -99,11 +97,43 @@ fun SaleScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            // Low Stock Warning Banner for Cashier
+            if (outOfStockProducts.isNotEmpty() || lowStockProducts.isNotEmpty()) {
+                Surface(
+                    color = Color(0xFFFFFBEB),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCD34D)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .testTag("pos_low_stock_banner")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = Color(0xFFD97706),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "ការដាស់តឿនស្តុក: មាន ${outOfStockProducts.size} មុខអស់ស្តុក, ${lowStockProducts.size} មុខសល់តិច",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF92400E)
+                        )
+                    }
+                }
+            }
+
             // Category Filter Row
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 6.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -129,22 +159,22 @@ fun SaleScreen(
                             color = if (isSelected) Color.White
                             else MaterialTheme.colorScheme.onSurface,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
             }
 
-            // Products Grid (with bottom padding if cart bar is visible)
+            // Products Grid
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
+                columns = GridCells.Adaptive(minSize = 155.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("products_grid"),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 8.dp,
+                    top = 4.dp,
                     bottom = if (cartItems.isNotEmpty()) 90.dp else 16.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -300,18 +330,26 @@ fun ProductCard(
     onQuickAdd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isOutOfStock = product.isOutOfStock
+    val isLowStock = product.isLowStock
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
+            .alpha(if (isOutOfStock) 0.65f else 1.0f)
             .testTag("product_card_${product.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (inCartCount > 0) MaterialTheme.colorScheme.primary
-            else Color(product.primaryColorHex).copy(alpha = 0.25f)
+            when {
+                inCartCount > 0 -> MaterialTheme.colorScheme.primary
+                isOutOfStock -> Color(0xFFFCA5A5)
+                isLowStock -> Color(0xFFFCD34D)
+                else -> Color(product.primaryColorHex).copy(alpha = 0.25f)
+            }
         )
     ) {
         Column(
@@ -320,31 +358,52 @@ fun ProductCard(
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Icon / Emoji + In Cart Badge
-            Box(
-                modifier = Modifier.size(62.dp),
-                contentAlignment = Alignment.Center
+            // Stock Indicator Badge at top of card
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Color(product.primaryColorHex).copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
+                // Stock badge
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = when {
+                        isOutOfStock -> Color(0xFFFEF2F2)
+                        isLowStock -> Color(0xFFFFFBEB)
+                        else -> Color(0xFFF0FDF4)
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        when {
+                            isOutOfStock -> Color(0xFFFCA5A5)
+                            isLowStock -> Color(0xFFFCD34D)
+                            else -> Color(0xFFBBF7D0)
+                        }
+                    )
                 ) {
                     Text(
-                        text = product.iconEmoji,
-                        fontSize = 28.sp
+                        text = when {
+                            isOutOfStock -> "🚫 អស់ស្តុក"
+                            isLowStock -> "⚠️ សល់ ${product.stockCount}"
+                            else -> "ស្តុក: ${product.stockCount}"
+                        },
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            isOutOfStock -> Color(0xFFDC2626)
+                            isLowStock -> Color(0xFFD97706)
+                            else -> Color(0xFF15803D)
+                        },
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
 
+                // In Cart Count Badge
                 if (inCartCount > 0) {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .align(Alignment.TopEnd)
+                        modifier = Modifier.size(20.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -356,6 +415,22 @@ fun ProductCard(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Emoji Icon Box
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(Color(product.primaryColorHex).copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = product.iconEmoji,
+                    fontSize = 28.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -411,19 +486,22 @@ fun ProductCard(
 
                 FilledIconButton(
                     onClick = onQuickAdd,
+                    enabled = !isOutOfStock,
                     modifier = Modifier
                         .size(32.dp)
                         .testTag("quick_add_${product.id}"),
                     shape = RoundedCornerShape(8.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        containerColor = if (isOutOfStock) Color(0xFFE2E8F0) else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if (isOutOfStock) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onPrimaryContainer,
+                        disabledContainerColor = Color(0xFFF1F5F9),
+                        disabledContentColor = Color(0xFF94A3B8)
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = if (isOutOfStock) Icons.Default.Block else Icons.Default.Add,
                         contentDescription = "ដាក់កន្ត្រកភ្លាមៗ",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }

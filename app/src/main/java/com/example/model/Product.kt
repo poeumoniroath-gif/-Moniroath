@@ -15,8 +15,16 @@ data class Product(
     val categoryKh: String,
     val iconEmoji: String,
     val primaryColorHex: Long,
-    val descriptionKh: String = ""
-)
+    val descriptionKh: String = "",
+    val stockCount: Int = 25,
+    val lowStockThreshold: Int = 5
+) {
+    val isOutOfStock: Boolean
+        get() = stockCount <= 0
+
+    val isLowStock: Boolean
+        get() = stockCount in 1..lowStockThreshold
+}
 
 object ProductCatalog {
     val items: List<Product> = listOf(
@@ -28,7 +36,9 @@ object ProductCatalog {
             categoryKh = "ភេសជ្ជៈ",
             iconEmoji = "🥤",
             primaryColorHex = 0xFF00BCD4,
-            descriptionKh = "ភេសជ្ជៈទឹកកកឈូសរសជាតិផ្លែឈើឆ្ងាញ់ត្រជាក់ចិត្ត"
+            descriptionKh = "ភេសជ្ជៈទឹកកកឈូសរសជាតិផ្លែឈើឆ្ងាញ់ត្រជាក់ចិត្ត",
+            stockCount = 30,
+            lowStockThreshold = 5
         ),
         Product(
             id = "nom_gop_thom",
@@ -38,7 +48,9 @@ object ProductCatalog {
             categoryKh = "អាហារសម្រន់",
             iconEmoji = "🍿",
             primaryColorHex = 0xFFFF9800,
-            descriptionKh = "នំកញ្ចប់ខ្នាតធំ ស្រួយឆ្ងាញ់"
+            descriptionKh = "នំកញ្ចប់ខ្នាតធំ ស្រួយឆ្ងាញ់",
+            stockCount = 20,
+            lowStockThreshold = 5
         ),
         Product(
             id = "nom_gop_toch",
@@ -48,7 +60,9 @@ object ProductCatalog {
             categoryKh = "អាហារសម្រន់",
             iconEmoji = "🍘",
             primaryColorHex = 0xFFFFB74D,
-            descriptionKh = "នំកញ្ចប់ខ្នាតតូច រសជាតិឆ្ងាញ់"
+            descriptionKh = "នំកញ្ចប់ខ្នាតតូច រសជាតិឆ្ងាញ់",
+            stockCount = 25,
+            lowStockThreshold = 5
         ),
         Product(
             id = "saray_korea",
@@ -58,7 +72,9 @@ object ProductCatalog {
             categoryKh = "អាហារសម្រន់",
             iconEmoji = "🍙",
             primaryColorHex = 0xFF4CAF50,
-            descriptionKh = "សារាយសមុទ្របន្ទះបំពងបែបកូរ៉េ"
+            descriptionKh = "សារាយសមុទ្របន្ទះបំពងបែបកូរ៉េ",
+            stockCount = 15,
+            lowStockThreshold = 4
         ),
         Product(
             id = "mee_kambong",
@@ -68,7 +84,9 @@ object ProductCatalog {
             categoryKh = "អាហារសម្រន់",
             iconEmoji = "🍜",
             primaryColorHex = 0xFFE91E63,
-            descriptionKh = "មីកំប៉ុងឆ្ងាញ់ពិសាស្រួលញ៉ាំ"
+            descriptionKh = "មីកំប៉ុងឆ្ងាញ់ពិសាស្រួលញ៉ាំ",
+            stockCount = 18,
+            lowStockThreshold = 5
         ),
         Product(
             id = "nido_chroung_ori",
@@ -78,7 +96,9 @@ object ProductCatalog {
             categoryKh = "នំ & ទឹកដោះគោ",
             iconEmoji = "🧃",
             primaryColorHex = 0xFF9C27B0,
-            descriptionKh = "នីដូជ្រុង រសជាតិដើម Original"
+            descriptionKh = "នីដូជ្រុង រសជាតិដើម Original",
+            stockCount = 12,
+            lowStockThreshold = 3
         ),
         Product(
             id = "nido_chroung_n",
@@ -88,7 +108,9 @@ object ProductCatalog {
             categoryKh = "នំ & ទឹកដោះគោ",
             iconEmoji = "📦",
             primaryColorHex = 0xFF673AB7,
-            descriptionKh = "នីដូជ្រុង ប្រភេទ N"
+            descriptionKh = "នីដូជ្រុង ប្រភេទ N",
+            stockCount = 10,
+            lowStockThreshold = 3
         ),
         Product(
             id = "nido_moul",
@@ -98,7 +120,9 @@ object ProductCatalog {
             categoryKh = "នំ & ទឹកដោះគោ",
             iconEmoji = "🥛",
             primaryColorHex = 0xFF3F51B5,
-            descriptionKh = "នីដូមូល រសជាតិឆ្ងាញ់ពិសា"
+            descriptionKh = "នីដូមូល រសជាតិឆ្ងាញ់ពិសា",
+            stockCount = 10,
+            lowStockThreshold = 3
         ),
         Product(
             id = "koun_neak",
@@ -108,7 +132,9 @@ object ProductCatalog {
             categoryKh = "របស់លេង",
             iconEmoji = "🐲",
             primaryColorHex = 0xFF009688,
-            descriptionKh = "តុក្កតារបស់លេងកូននាគ"
+            descriptionKh = "តុក្កតារបស់លេងកូននាគ",
+            stockCount = 8,
+            lowStockThreshold = 2
         ),
         Product(
             id = "nom_pao",
@@ -118,7 +144,9 @@ object ProductCatalog {
             categoryKh = "អាហារសម្រន់",
             iconEmoji = "🥟",
             primaryColorHex = 0xFF8D6E63,
-            descriptionKh = "នំប៉ាវក្តៅៗរសជាតិឆ្ងាញ់"
+            descriptionKh = "នំប៉ាវក្តៅៗរសជាតិឆ្ងាញ់",
+            stockCount = 14,
+            lowStockThreshold = 4
         ),
         Product(
             id = "strawberry_bangvil",
@@ -128,7 +156,9 @@ object ProductCatalog {
             categoryKh = "ស្ករគ្រាប់",
             iconEmoji = "🍓",
             primaryColorHex = 0xFFF06292,
-            descriptionKh = "ស្ករគ្រាប់ស្ត្របឺរីបង្វិលសប្បាយញ៉ាំ"
+            descriptionKh = "ស្ករគ្រាប់ស្ត្របឺរីបង្វិលសប្បាយញ៉ាំ",
+            stockCount = 20,
+            lowStockThreshold = 5
         ),
         Product(
             id = "blind_box",
@@ -138,7 +168,9 @@ object ProductCatalog {
             categoryKh = "របស់លេង",
             iconEmoji = "🎁",
             primaryColorHex = 0xFFFF5722,
-            descriptionKh = "ប្រអប់កាដូភ្ញាក់ផ្អើល Blind Box"
+            descriptionKh = "ប្រអប់កាដូភ្ញាក់ផ្អើល Blind Box",
+            stockCount = 25,
+            lowStockThreshold = 5
         ),
         Product(
             id = "fan",
@@ -148,7 +180,9 @@ object ProductCatalog {
             categoryKh = "របស់លេង",
             iconEmoji = "🪭",
             primaryColorHex = 0xFF03A9F4,
-            descriptionKh = "កង្ហារតូចគួរឱ្យស្រលាញ់"
+            descriptionKh = "កង្ហារតូចគួរឱ្យស្រលាញ់",
+            stockCount = 16,
+            lowStockThreshold = 4
         ),
         Product(
             id = "gummy",
@@ -158,7 +192,9 @@ object ProductCatalog {
             categoryKh = "ស្ករគ្រាប់",
             iconEmoji = "🍬",
             primaryColorHex = 0xFF8BC34A,
-            descriptionKh = "ស្ករស្វិតចាហួយ Gummy រសជាតិផ្លែឈើ"
+            descriptionKh = "ស្ករស្វិតចាហួយ Gummy រសជាតិផ្លែឈើ",
+            stockCount = 30,
+            lowStockThreshold = 5
         )
     )
 

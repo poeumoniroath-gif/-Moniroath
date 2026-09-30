@@ -12,9 +12,12 @@ import com.example.model.PaymentMethod
 import com.example.model.Product
 import com.example.model.ProductCatalog
 import com.example.model.ProductCategory
+import com.example.model.UserRole
+import com.example.model.UserSession
 import com.example.util.CloudConfig
 import com.example.util.CloudSyncManager
 import com.example.util.Formatters
+import com.example.util.SessionManager
 import com.example.util.SyncState
 import com.example.util.TelegramHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +55,10 @@ data class SyncFeedbackMessage(
 class SalesViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: SalesRepository
 
+    // --- AUTHENTICATION & SESSION STATE ---
+    private val _currentUserSession = MutableStateFlow<UserSession?>(SessionManager.getSession(application))
+    val currentUserSession: StateFlow<UserSession?> = _currentUserSession.asStateFlow()
+
     // Cloud & Telegram Settings State
     private val _cloudConfig = MutableStateFlow(CloudSyncManager.getSavedConfig(application))
     val cloudConfig: StateFlow<CloudConfig> = _cloudConfig.asStateFlow()
@@ -87,12 +94,105 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val db = AppDatabase.getDatabase(application)
-        repository = SalesRepository(db.salesDao())
+        repository = SalesRepository(db.salesDao(), db.productDao())
         refreshNetworkStatus()
+
+        // Seed default products if not yet in database
+        viewModelScope.launch {
+            repository.ensureDefaultProductsSeeded()
+        }
 
         // Auto-pull from Google Drive on startup if URL is configured
         if (_cloudConfig.value.googleDriveScriptUrl.isNotBlank()) {
             syncWithGoogleDrive(silent = true)
+        }
+    }
+
+    // --- USER AUTHENTICATION ACTIONS ---
+
+    fun login(role: UserRole, pin: String): Boolean {
+        if (pin.trim() == role.fixedPin) {
+            val session = UserSession(
+                username = role.defaultUsername,
+                role = role
+            )
+            SessionManager.saveSession(getApplication(), session)
+            _currentUserSession.value = session
+            return true
+        }
+        return false
+    }
+
+    fun logout() {
+        SessionManager.clearSession(getApplication())
+        _currentUserSession.value = null
+        _selectedTab.value = 0
+        _cartItems.value = emptyList()
+        _activeProductForSale.value = null
+    }
+
+    // --- PRODUCTS & INVENTORY STATE ---
+
+    val products: StateFlow<List<Product>> = repository.getAllProducts()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ProductCatalog.items
+        )
+
+    val lowStockProducts: StateFlow<List<Product>> = products.map { list ->
+        list.filter { it.isLowStock }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val outOfStockProducts: StateFlow<List<Product>> = products.map { list ->
+        list.filter { it.isOutOfStock }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val alertStockProducts: StateFlow<List<Product>> = products.map { list ->
+        list.filter { it.isOutOfStock || it.isLowStock }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // Product CRUD Operations (Admin Only)
+
+    fun saveProduct(product: Product) {
+        viewModelScope.launch {
+            repository.saveProduct(product)
+            _feedbackMessage.value = SyncFeedbackMessage("បានរក្សាទុកទំនិញ '${product.nameKh}' ជោគជ័យ", true)
+        }
+    }
+
+    fun deleteProduct(productId: String, productName: String = "") {
+        viewModelScope.launch {
+            repository.deleteProduct(productId)
+            // Also remove from cart if present
+            _cartItems.value = _cartItems.value.filter { it.product.id != productId }
+            _feedbackMessage.value = SyncFeedbackMessage("បានលុបទំនិញ '$productName' រួចរាល់", true)
+        }
+    }
+
+    fun quickRestock(productId: String, amount: Int) {
+        viewModelScope.launch {
+            repository.restockProduct(productId, amount)
+            _feedbackMessage.value = SyncFeedbackMessage("បានបន្ថែមស្តុក +$amount ជោគជ័យ", true)
+        }
+    }
+
+    fun updateStockCount(productId: String, newStock: Int) {
+        viewModelScope.launch {
+            repository.updateStockCount(productId, newStock.coerceAtLeast(0))
+            _feedbackMessage.value = SyncFeedbackMessage("បានកែប្រែចំនួនស្តុកជោគជ័យ", true)
         }
     }
 
@@ -179,10 +279,13 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = 0L
     )
 
-    // Selected Date Product Breakdown Summary
-    val selectedDateProductSummaries: StateFlow<List<ProductSaleSummary>> = selectedDateSales.map { sales ->
+    // Selected Date Product Breakdown Summary (dynamically joins sales with products)
+    val selectedDateProductSummaries: StateFlow<List<ProductSaleSummary>> = combine(
+        selectedDateSales,
+        products
+    ) { sales, currentProducts ->
         val group = sales.groupBy { it.productId }
-        ProductCatalog.items.mapNotNull { product ->
+        currentProducts.mapNotNull { product ->
             val matchingSales = group[product.id]
             if (matchingSales != null && matchingSales.isNotEmpty()) {
                 val totalQty = matchingSales.sumOf { it.quantity }
@@ -229,6 +332,10 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openSaleDialog(product: Product) {
+        if (product.isOutOfStock) {
+            _feedbackMessage.value = SyncFeedbackMessage("ទំនិញ '${product.nameKh}' អស់ពីស្តុកហើយ!", false)
+            return
+        }
         _activeProductForSale.value = product
         _activeQuantity.value = 1
     }
@@ -239,7 +346,13 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun incrementQuantity() {
-        _activeQuantity.value = (_activeQuantity.value + 1).coerceAtMost(999)
+        val currentProduct = _activeProductForSale.value ?: return
+        val maxAllowed = currentProduct.stockCount.coerceAtLeast(1)
+        if (_activeQuantity.value < maxAllowed) {
+            _activeQuantity.value += 1
+        } else {
+            _feedbackMessage.value = SyncFeedbackMessage("ស្តុកមានត្រឹមតែ $maxAllowed ឯកតា!", false)
+        }
     }
 
     fun decrementQuantity() {
@@ -249,24 +362,50 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setQuantity(qty: Int) {
-        if (qty in 1..999) {
+        val currentProduct = _activeProductForSale.value ?: return
+        val maxAllowed = currentProduct.stockCount.coerceAtLeast(1)
+        if (qty in 1..maxAllowed) {
             _activeQuantity.value = qty
+        } else if (qty > maxAllowed) {
+            _activeQuantity.value = maxAllowed
+            _feedbackMessage.value = SyncFeedbackMessage("កំណត់ត្រឹម $maxAllowed (ស្តុកអតិបរមា)", false)
         }
     }
 
-    // --- CART FUNCTIONALITY ---
+    // --- CART FUNCTIONALITY WITH STOCK CHECKS ---
 
     fun addToCart(product: Product, quantity: Int = 1) {
+        if (product.isOutOfStock) {
+            _feedbackMessage.value = SyncFeedbackMessage("ទំនិញ '${product.nameKh}' អស់ពីស្តុកហើយ មិនអាចដាក់កន្ត្រកបានទេ!", false)
+            return
+        }
+
         val currentList = _cartItems.value.toMutableList()
         val index = currentList.indexOfFirst { it.product.id == product.id }
-        if (index >= 0) {
-            val existing = currentList[index]
-            val newQty = (existing.quantity + quantity).coerceAtMost(999)
-            currentList[index] = existing.copy(quantity = newQty)
+        val existingQty = if (index >= 0) currentList[index].quantity else 0
+        val targetQty = existingQty + quantity
+
+        if (targetQty > product.stockCount) {
+            val addable = (product.stockCount - existingQty).coerceAtLeast(0)
+            if (addable > 0) {
+                if (index >= 0) {
+                    currentList[index] = currentList[index].copy(quantity = product.stockCount)
+                } else {
+                    currentList.add(CartItem(product = product, quantity = addable))
+                }
+                _cartItems.value = currentList
+                _feedbackMessage.value = SyncFeedbackMessage("បានដាក់កន្ត្រកត្រឹម $addable ឯកតា (ស្តុកសរុប ${product.stockCount})", false)
+            } else {
+                _feedbackMessage.value = SyncFeedbackMessage("ស្តុកមានត្រឹម ${product.stockCount} ឯកតា (ក្នុងកន្ត្រករួចហើយ)", false)
+            }
         } else {
-            currentList.add(CartItem(product = product, quantity = quantity.coerceAtLeast(1)))
+            if (index >= 0) {
+                currentList[index] = currentList[index].copy(quantity = targetQty)
+            } else {
+                currentList.add(CartItem(product = product, quantity = quantity.coerceAtLeast(1)))
+            }
+            _cartItems.value = currentList
         }
-        _cartItems.value = currentList
         closeSaleDialog()
     }
 
@@ -275,11 +414,14 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         val index = currentList.indexOfFirst { it.product.id == productId }
         if (index >= 0) {
             val existing = currentList[index]
+            val productInCatalog = products.value.find { it.id == productId } ?: existing.product
             val newQty = existing.quantity + delta
             if (newQty <= 0) {
                 currentList.removeAt(index)
+            } else if (newQty > productInCatalog.stockCount) {
+                _feedbackMessage.value = SyncFeedbackMessage("ស្តុកមានត្រឹមតែ ${productInCatalog.stockCount} ឯកតា!", false)
             } else {
-                currentList[index] = existing.copy(quantity = newQty.coerceAtMost(999))
+                currentList[index] = existing.copy(quantity = newQty)
             }
             _cartItems.value = currentList
         }
@@ -294,11 +436,21 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Checkout all items in the cart at once
+     * Checkout all items in the cart at once, automatically depleting stock
      */
     fun checkoutCart(paymentMethod: PaymentMethod = PaymentMethod.CASH) {
         val items = _cartItems.value
         if (items.isEmpty()) return
+
+        // Verify stock for all items
+        val currentCatalog = products.value.associateBy { it.id }
+        for (item in items) {
+            val liveProduct = currentCatalog[item.product.id]
+            if (liveProduct != null && liveProduct.stockCount < item.quantity) {
+                _feedbackMessage.value = SyncFeedbackMessage("ទំនិញ '${liveProduct.nameKh}' នៅសល់តែ ${liveProduct.stockCount} ប៉ុណ្ណោះ មិនគ្រប់គ្រាន់ទេ!", false)
+                return
+            }
+        }
 
         val now = System.currentTimeMillis()
         val todayStr = Formatters.getTodayIsoString()
@@ -322,7 +474,14 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         val summaries = items.map { "${it.product.iconEmoji} ${it.product.nameKh} x${it.quantity}" }
 
         viewModelScope.launch {
+            // Record sales
             repository.recordSales(records)
+
+            // Real-time stock depletion for each checked out product
+            items.forEach { item ->
+                repository.decrementStock(item.product.id, item.quantity)
+            }
+
             _cartItems.value = emptyList()
 
             _lastSaleSuccess.value = SaleSuccessEvent(
@@ -342,20 +501,28 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Instant single-item sell without going through cart
+     * Instant single-item sell without going through cart, automatically depleting stock
      */
     fun quickSellSingle(paymentMethod: PaymentMethod = PaymentMethod.CASH) {
         val product = _activeProductForSale.value ?: return
+        val currentCatalog = products.value.associateBy { it.id }
+        val liveProduct = currentCatalog[product.id] ?: product
+
         val qty = _activeQuantity.value.coerceAtLeast(1)
-        val totalPrice = product.priceRiel * qty
+        if (liveProduct.stockCount < qty) {
+            _feedbackMessage.value = SyncFeedbackMessage("ទំនិញ '${liveProduct.nameKh}' នៅសល់តែ ${liveProduct.stockCount} ឯកតា មិនគ្រប់គ្រាន់ទេ!", false)
+            return
+        }
+
+        val totalPrice = liveProduct.priceRiel * qty
         val todayStr = Formatters.getTodayIsoString()
         val now = System.currentTimeMillis()
 
         val record = SaleRecord(
             id = now,
-            productId = product.id,
-            productName = product.nameKh,
-            unitPrice = product.priceRiel,
+            productId = liveProduct.id,
+            productName = liveProduct.nameKh,
+            unitPrice = liveProduct.priceRiel,
             quantity = qty,
             totalPrice = totalPrice,
             timestamp = now,
@@ -365,12 +532,16 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             repository.recordSale(record)
+
+            // Real-time stock decrement
+            repository.decrementStock(liveProduct.id, qty)
+
             _lastSaleSuccess.value = SaleSuccessEvent(
-                productName = product.nameKh,
+                productName = liveProduct.nameKh,
                 quantity = qty,
                 totalAmount = totalPrice,
                 paymentMethod = paymentMethod,
-                itemsSummary = listOf("${product.iconEmoji} ${product.nameKh} x$qty")
+                itemsSummary = listOf("${liveProduct.iconEmoji} ${liveProduct.nameKh} x$qty")
             )
             _activeProductForSale.value = null
             _activeQuantity.value = 1
@@ -488,11 +659,6 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- GOOGLE DRIVE SHARED DATABASE SYNC ---
 
-    /**
-     * 2-Way Sync with Google Drive:
-     * 1. Pulls all remote sales and closures from Google Drive and merges into local DB
-     * 2. Pushes all local sales and closures to Google Drive
-     */
     fun syncWithGoogleDrive(silent: Boolean = false) {
         val config = _cloudConfig.value
         refreshNetworkStatus()

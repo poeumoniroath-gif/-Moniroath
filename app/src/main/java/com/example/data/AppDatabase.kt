@@ -6,12 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [SaleRecord::class, DailyClosureRecord::class],
-    version = 2,
+    entities = [SaleRecord::class, DailyClosureRecord::class, ProductEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun salesDao(): SalesDao
+    abstract fun productDao(): ProductDao
 
     companion object {
         @Volatile

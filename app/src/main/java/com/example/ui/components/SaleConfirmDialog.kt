@@ -155,13 +155,23 @@ fun SaleConfirmDialog(
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "តម្លៃរាយ: ${Formatters.formatRiel(product.priceRiel)}",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "តម្លៃរាយ: ${Formatters.formatRiel(product.priceRiel)}",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "• ស្តុក: ${product.stockCount}",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = if (product.isLowStock) Color(0xFFD97706) else Color(0xFF15803D),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
                         }
                     }
                 }
