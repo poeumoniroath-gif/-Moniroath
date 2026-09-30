@@ -113,7 +113,7 @@ fun JollySlushieApp(
 
     // Role-Based Navigation Tabs Guard:
     // Admin gets Sales, Inventory, Reports, History
-    // Cashier gets Sales POS only (preventing inventory modification, editing pricing, administrative controls)
+    // Cashier gets Sales POS and Reports
     val navTabs = if (isAdmin) {
         listOf(
             NavTabItem(
@@ -153,6 +153,13 @@ fun JollySlushieApp(
                 selectedIcon = Icons.Filled.Storefront,
                 unselectedIcon = Icons.Outlined.Storefront,
                 testTag = "nav_tab_sale"
+            ),
+            NavTabItem(
+                id = 2,
+                title = "របាយការណ៍",
+                selectedIcon = Icons.Filled.Assessment,
+                unselectedIcon = Icons.Outlined.Assessment,
+                testTag = "nav_tab_report"
             )
         )
     }
@@ -228,16 +235,14 @@ fun JollySlushieApp(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // View Guard: Cashier is locked to SaleScreen (0)
-            if (!isAdmin || selectedTab == 0) {
-                SaleScreen(viewModel = viewModel)
-            } else {
-                when (selectedTab) {
-                    1 -> InventoryScreen(viewModel = viewModel)
-                    2 -> ReportScreen(viewModel = viewModel)
-                    3 -> HistoryScreen(viewModel = viewModel)
-                    else -> SaleScreen(viewModel = viewModel)
-                }
+            // View Guard: Cashier can access POS (0) and Report (2).
+            // Inventory (1) and History (3) remain protected for Admin.
+            when (selectedTab) {
+                0 -> SaleScreen(viewModel = viewModel)
+                1 -> if (isAdmin) InventoryScreen(viewModel = viewModel) else SaleScreen(viewModel = viewModel)
+                2 -> ReportScreen(viewModel = viewModel)
+                3 -> if (isAdmin) HistoryScreen(viewModel = viewModel) else SaleScreen(viewModel = viewModel)
+                else -> SaleScreen(viewModel = viewModel)
             }
         }
     }

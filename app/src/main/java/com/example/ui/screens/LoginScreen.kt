@@ -443,21 +443,6 @@ fun LoginScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Quick Hint Badge for easy evaluation
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF0F172A).copy(alpha = 0.6f)
-                    ) {
-                        Text(
-                            text = "💡 Admin PIN: 9999216  |  Cashier PIN: 9999",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
                 }
             }
         }

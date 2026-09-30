@@ -20,6 +20,7 @@ import com.example.util.Formatters
 import com.example.util.SessionManager
 import com.example.util.SyncState
 import com.example.util.TelegramHelper
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,34 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+enum class ReportPeriod(val titleKh: String, val titleEn: String, val iconEmoji: String) {
+    DAILY("ប្រចាំថ្ងៃ", "Daily", "📅"),
+    WEEKLY("ប្រចាំសប្ដាហ៍", "Weekly", "📊"),
+    ANNUALLY("ប្រចាំឆ្នាំ", "Annually", "📈")
+}
+
+data class DaySalesStat(
+    val dateIso: String,
+    val dayNameKhmer: String,
+    val dayOfMonth: String,
+    val revenue: Long,
+    val itemsCount: Int,
+    val transactionsCount: Int,
+    val cashRevenue: Long,
+    val abaRevenue: Long,
+    val isToday: Boolean
+)
+
+data class MonthSalesStat(
+    val monthNumber: Int,
+    val monthNameKhmer: String,
+    val revenue: Long,
+    val itemsCount: Int,
+    val transactionsCount: Int,
+    val cashRevenue: Long,
+    val abaRevenue: Long
+)
 
 data class ProductSaleSummary(
     val product: Product,
@@ -321,6 +350,136 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    // --- REPORT PERIOD (Daily, Weekly, Annually) ---
+    private val _selectedReportPeriod = MutableStateFlow(ReportPeriod.DAILY)
+    val selectedReportPeriod: StateFlow<ReportPeriod> = _selectedReportPeriod.asStateFlow()
+
+    // Weekly anchor date (defaults to today)
+    private val _selectedWeeklyDate = MutableStateFlow(Formatters.getTodayIsoString())
+    val selectedWeeklyDate: StateFlow<String> = _selectedWeeklyDate.asStateFlow()
+
+    // Annual anchor year (defaults to current year)
+    private val _selectedAnnualYear = MutableStateFlow(Formatters.getCurrentYear())
+    val selectedAnnualYear: StateFlow<Int> = _selectedAnnualYear.asStateFlow()
+
+    // Weekly Sales Stream
+    val weeklySales: StateFlow<List<SaleRecord>> = combine(allSalesHistory, _selectedWeeklyDate) { allSales, anchorDate ->
+        val (startIso, endIso) = Formatters.getWeekBoundaries(anchorDate)
+        allSales.filter { it.dateString in startIso..endIso }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val weeklyRevenue: StateFlow<Long> = weeklySales.map { list -> list.sumOf { it.totalPrice.toLong() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val weeklyCashRevenue: StateFlow<Long> = weeklySales.map { list ->
+        list.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val weeklyAbaRevenue: StateFlow<Long> = weeklySales.map { list ->
+        list.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val weeklyItemsCount: StateFlow<Int> = weeklySales.map { list -> list.sumOf { it.quantity } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val weeklyTransactionsCount: StateFlow<Int> = weeklySales.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val weeklyDailyBreakdown: StateFlow<List<DaySalesStat>> = combine(allSalesHistory, _selectedWeeklyDate) { allSales, anchorDate ->
+        val days = Formatters.getDaysOfWeek(anchorDate)
+        val salesByDate = allSales.groupBy { it.dateString }
+        days.map { dayItem ->
+            val daySales = salesByDate[dayItem.dateIso] ?: emptyList()
+            DaySalesStat(
+                dateIso = dayItem.dateIso,
+                dayNameKhmer = dayItem.dayNameKhmer,
+                dayOfMonth = dayItem.dayOfMonth,
+                revenue = daySales.sumOf { it.totalPrice.toLong() },
+                itemsCount = daySales.sumOf { it.quantity },
+                transactionsCount = daySales.size,
+                cashRevenue = daySales.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() },
+                abaRevenue = daySales.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() },
+                isToday = dayItem.isToday
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val weeklyProductSummaries: StateFlow<List<ProductSaleSummary>> = combine(weeklySales, products) { sales, currentProducts ->
+        val group = sales.groupBy { it.productId }
+        currentProducts.mapNotNull { product ->
+            val matching = group[product.id]
+            if (matching != null && matching.isNotEmpty()) {
+                ProductSaleSummary(
+                    product = product,
+                    totalQuantity = matching.sumOf { it.quantity },
+                    totalAmount = matching.sumOf { it.totalPrice.toLong() }
+                )
+            } else null
+        }.sortedByDescending { it.totalAmount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Annual Sales Stream
+    val annualSales: StateFlow<List<SaleRecord>> = combine(allSalesHistory, _selectedAnnualYear) { allSales, year ->
+        val yearPrefix = "$year-"
+        allSales.filter { it.dateString.startsWith(yearPrefix) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val annualRevenue: StateFlow<Long> = annualSales.map { list -> list.sumOf { it.totalPrice.toLong() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val annualCashRevenue: StateFlow<Long> = annualSales.map { list ->
+        list.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val annualAbaRevenue: StateFlow<Long> = annualSales.map { list ->
+        list.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val annualItemsCount: StateFlow<Int> = annualSales.map { list -> list.sumOf { it.quantity } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val annualTransactionsCount: StateFlow<Int> = annualSales.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val annualMonthlyBreakdown: StateFlow<List<MonthSalesStat>> = combine(annualSales, _selectedAnnualYear) { sales, year ->
+        (1..12).map { monthNum ->
+            val monthStr = String.format(Locale.US, "%02d", monthNum)
+            val prefix = "$year-$monthStr"
+            val monthSales = sales.filter { it.dateString.startsWith(prefix) }
+            MonthSalesStat(
+                monthNumber = monthNum,
+                monthNameKhmer = Formatters.getKhmerMonthName(monthNum),
+                revenue = monthSales.sumOf { it.totalPrice.toLong() },
+                itemsCount = monthSales.sumOf { it.quantity },
+                transactionsCount = monthSales.size,
+                cashRevenue = monthSales.filter { it.paymentMethod != "ABA" }.sumOf { it.totalPrice.toLong() },
+                abaRevenue = monthSales.filter { it.paymentMethod == "ABA" }.sumOf { it.totalPrice.toLong() }
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val annualProductSummaries: StateFlow<List<ProductSaleSummary>> = combine(annualSales, products) { sales, currentProducts ->
+        val group = sales.groupBy { it.productId }
+        currentProducts.mapNotNull { product ->
+            val matching = group[product.id]
+            if (matching != null && matching.isNotEmpty()) {
+                ProductSaleSummary(
+                    product = product,
+                    totalQuantity = matching.sumOf { it.quantity },
+                    totalAmount = matching.sumOf { it.totalPrice.toLong() }
+                )
+            } else null
+        }.sortedByDescending { it.totalAmount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allAvailableYears: StateFlow<List<Int>> = allSalesHistory.map { sales ->
+        val years = sales.mapNotNull { sale ->
+            sale.dateString.take(4).toIntOrNull()
+        }.toSet().toMutableSet()
+        years.add(Formatters.getCurrentYear())
+        years.sortedDescending()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf(Formatters.getCurrentYear()))
 
     // Navigation Tab Action
     fun selectTab(index: Int) {
@@ -618,20 +777,67 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
         _feedbackMessage.value = null
     }
 
-    fun triggerTelegramShare(context: android.content.Context, dateIso: String) {
-        val sales = selectedDateSales.value
-        val summaries = selectedDateProductSummaries.value
-        val closure = selectedDateClosure.value
-        val reportText = TelegramHelper.generateReportText(dateIso, sales, summaries, closure)
+    fun setReportPeriod(period: ReportPeriod) {
+        _selectedReportPeriod.value = period
+    }
+
+    fun previousWeek() {
+        _selectedWeeklyDate.value = Formatters.shiftWeek(_selectedWeeklyDate.value, -1)
+    }
+
+    fun nextWeek() {
+        _selectedWeeklyDate.value = Formatters.shiftWeek(_selectedWeeklyDate.value, 1)
+    }
+
+    fun resetToCurrentWeek() {
+        _selectedWeeklyDate.value = Formatters.getTodayIsoString()
+    }
+
+    fun selectAnnualYear(year: Int) {
+        _selectedAnnualYear.value = year
+    }
+
+    fun previousYear() {
+        _selectedAnnualYear.value -= 1
+    }
+
+    fun nextYear() {
+        _selectedAnnualYear.value += 1
+    }
+
+    fun getCurrentReportText(): String {
+        return when (_selectedReportPeriod.value) {
+            ReportPeriod.DAILY -> {
+                val dateIso = _selectedReportDate.value
+                val sales = selectedDateSales.value
+                val summaries = selectedDateProductSummaries.value
+                val closure = selectedDateClosure.value
+                TelegramHelper.generateReportText(dateIso, sales, summaries, closure)
+            }
+            ReportPeriod.WEEKLY -> {
+                val (startIso, endIso) = Formatters.getWeekBoundaries(_selectedWeeklyDate.value)
+                val sales = weeklySales.value
+                val summaries = weeklyProductSummaries.value
+                val breakdown = weeklyDailyBreakdown.value.map { it.dayNameKhmer to it.revenue }
+                TelegramHelper.generateWeeklyReportText(startIso, endIso, sales, summaries, breakdown)
+            }
+            ReportPeriod.ANNUALLY -> {
+                val year = _selectedAnnualYear.value
+                val sales = annualSales.value
+                val summaries = annualProductSummaries.value
+                val breakdown = annualMonthlyBreakdown.value.map { it.monthNameKhmer to it.revenue }
+                TelegramHelper.generateAnnualReportText(year, sales, summaries, breakdown)
+            }
+        }
+    }
+
+    fun triggerTelegramShare(context: android.content.Context, dateIso: String = _selectedReportDate.value) {
+        val reportText = getCurrentReportText()
         TelegramHelper.shareViaTelegram(context, reportText)
     }
 
     fun sendTelegramBotReportDirect() {
         val config = _cloudConfig.value
-        val dateString = _selectedReportDate.value
-        val sales = selectedDateSales.value
-        val summaries = selectedDateProductSummaries.value
-        val closure = selectedDateClosure.value
 
         if (config.telegramBotToken.isBlank() || config.telegramChatId.isBlank()) {
             _feedbackMessage.value = SyncFeedbackMessage("សូមកំណត់ Bot Token និង Chat ID ជាមុនសិន", false)
@@ -640,7 +846,7 @@ class SalesViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _syncState.value = SyncState.SYNCING
-            val reportText = TelegramHelper.generateReportText(dateString, sales, summaries, closure)
+            val reportText = getCurrentReportText()
             val result = TelegramHelper.sendViaTelegramBotApi(
                 botToken = config.telegramBotToken,
                 chatId = config.telegramChatId,

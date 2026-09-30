@@ -19,7 +19,7 @@ enum class UserRole(
         titleKh = "អ្នកគិតលុយ (Cashier)",
         defaultUsername = "Cashier",
         fixedPin = "9999",
-        descriptionKh = "សិទ្ធិកម្រិតលក់: លក់ទំនិញ & គិតលុយ POS ប៉ុណ្ណោះ"
+        descriptionKh = "សិទ្ធិលក់ & របាយការណ៍: លក់ទំនិញ POS និងពិនិត្យរបាយការណ៍លក់"
     );
 
     companion object {
