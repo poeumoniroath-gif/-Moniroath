@@ -95,7 +95,7 @@ fun LoginScreen(
 
         val success = onLoginSuccess(selectedRole, enteredPin)
         if (!success) {
-            errorMessage = "លេខសម្ងាត់មិនត្រឹមត្រូវទេ! (គន្លឹះ: Admin=${UserRole.ADMIN.fixedPin}, Cashier=${UserRole.CASHIER.fixedPin})"
+            errorMessage = "លេខសម្ងាត់មិនត្រឹមត្រូវទេ! សូមព្យាយាមម្ដងទៀត"
         }
     }
 
